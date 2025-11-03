@@ -1,0 +1,28 @@
+:root {
+  --el-color-primary: #52c41a;
+  --el-color-primary-light-3: #95de64;
+  --el-color-primary-light-5: #b7eb8f;
+  --el-color-primary-light-7: #d9f7be;
+  --el-color-primary-light-8: #e6f7ff;
+  --el-color-primary-light-9: #f6ffed;
+  --el-color-primary-dark-2: #389e0d;
+}
+
+html.dark {
+  --el-bg-color: #1a1a1a;
+  --el-bg-color-page: #141414;
+  --el-text-color-primary: #ffffff;
+  --el-text-color-regular: rgba(255, 255, 255, 0.85);
+  --el-text-color-secondary: rgba(255, 255, 255, 0.65);
+  --el-text-color-placeholder: rgba(255, 255, 255, 0.45);
+  --el-border-color: #434343;
+  --el-border-color-light: #303030;
+  --el-border-color-lighter: #262626;
+  --el-border-color-extra-light: #1d1d1d;
+}
+
+body {
+  background-color: var(--el-bg-color-page);
+  color: var(--el-text-color-primary);
+}
+
