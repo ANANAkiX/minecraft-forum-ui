@@ -77,3 +77,7 @@ export const forumApi = {
   likeReply: (replyId: number) => request.post(`/forum/replies/${replyId}/like`)
 }
 
+
+
+
+

@@ -19,7 +19,10 @@ export interface UserInfo {
   email: string
   avatar: string
   role: string
+  status?: number
   createTime: string
+  updateTime?: string
+  permissions?: string[]
 }
 
 export interface TokenResponse {
@@ -40,4 +43,8 @@ export const userApi = {
     })
   }
 }
+
+
+
+
 

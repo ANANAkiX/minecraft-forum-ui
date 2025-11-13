@@ -4,11 +4,13 @@
       <el-col :span="18">
         <div class="section-title">
           <h2>热门资源</h2>
-          <el-tabs v-model="activeCategory" @tab-change="handleCategoryChange">
-            <el-tab-pane label="全部" name=""></el-tab-pane>
-            <el-tab-pane label="整合包" name="PACK"></el-tab-pane>
-            <el-tab-pane label="MOD" name="MOD"></el-tab-pane>
-            <el-tab-pane label="资源包" name="RESOURCE"></el-tab-pane>
+          <el-tabs v-model="activeCategory" @tab-change="handleCategoryChange" v-if="categoryConfigs.length > 0">
+            <el-tab-pane 
+              v-for="config in categoryConfigs" 
+              :key="config.id"
+              :label="config.name" 
+              :name="config.code || ''"
+            ></el-tab-pane>
           </el-tabs>
         </div>
         <div class="resource-list" v-loading="loading">
@@ -106,6 +108,7 @@ import {ref, onMounted, onActivated, watch} from 'vue'
 import {useRouter, useRoute} from 'vue-router'
 import {resourceApi, type Resource} from '@/api/resource'
 import {forumApi, type ForumPost} from '@/api/forum'
+import {categoryApi, type CategoryConfig} from '@/api/category'
 import {User, Download, Star, Clock} from '@element-plus/icons-vue'
 import {ElMessage} from 'element-plus'
 import {isLoggedIn, toLogin} from "@/utils/auth.ts";
@@ -116,6 +119,7 @@ const route = useRoute()
 const loading = ref(false)
 const resourceList = ref<Resource[]>([])
 const hotPosts = ref<ForumPost[]>([])
+const categoryConfigs = ref<CategoryConfig[]>([])
 const activeCategory = ref('')
 const page = ref(1)
 const pageSize = ref(10)
@@ -146,6 +150,30 @@ const loadHotPosts = async () => {
     hotPosts.value = result.list
   } catch (error) {
     // 静默失败
+  }
+}
+
+const loadCategoryConfigs = async () => {
+  try {
+    const configs = await categoryApi.getEnabledConfigs('RESOURCE')
+    categoryConfigs.value = configs
+    // 设置默认选中的分类（isDefault=1的）
+    const defaultConfig = configs.find(c => c.isDefault === 1)
+    if (defaultConfig) {
+      activeCategory.value = defaultConfig.code || ''
+    } else if (configs.length > 0) {
+      activeCategory.value = configs[0].code || ''
+    }
+  } catch (error) {
+    ElMessage.error('加载分类配置失败')
+    // 如果加载失败，使用默认配置
+    categoryConfigs.value = [
+      { id: 0, name: '全部', code: '', type: 'RESOURCE', sortOrder: 0, isDefault: 1, status: 1, createTime: '', updateTime: '' },
+      { id: 1, name: '整合包', code: 'PACK', type: 'RESOURCE', sortOrder: 1, isDefault: 0, status: 1, createTime: '', updateTime: '' },
+      { id: 2, name: 'MOD', code: 'MOD', type: 'RESOURCE', sortOrder: 2, isDefault: 0, status: 1, createTime: '', updateTime: '' },
+      { id: 3, name: '资源包', code: 'RESOURCE', type: 'RESOURCE', sortOrder: 3, isDefault: 0, status: 1, createTime: '', updateTime: '' }
+    ]
+    activeCategory.value = ''
   }
 }
 
@@ -193,12 +221,16 @@ watch(() => route.name, (newName) => {
 
 // 组件激活时刷新数据（keep-alive 场景）
 onActivated(() => {
-  loadResources()
+  loadCategoryConfigs().then(() => {
+    loadResources()
+  })
   loadHotPosts()
 })
 
 onMounted(() => {
-  loadResources()
+  loadCategoryConfigs().then(() => {
+    loadResources()
+  })
   loadHotPosts()
 })
 </script>

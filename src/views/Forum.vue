@@ -4,13 +4,17 @@
       <el-col :span="18">
         <div class="section-title">
           <h2>论坛</h2>
-          <el-tabs v-model="activeCategory" @tab-change="handleCategoryChange">
-            <el-tab-pane label="全部" name=""></el-tab-pane>
-            <el-tab-pane label="分享" name="SHARE"></el-tab-pane>
-            <el-tab-pane label="求助" name="HELP"></el-tab-pane>
-            <el-tab-pane label="教程" name="TUTORIAL"></el-tab-pane>
-            <el-tab-pane label="公告" name="ANNOUNCEMENT"></el-tab-pane>
+          <el-tabs v-model="activeCategory" @tab-change="handleCategoryChange" v-if="categoryConfigs.length > 0">
+            <el-tab-pane 
+              v-for="config in categoryConfigs" 
+              :key="`forum-tab-${config.id}-${config.code}`"
+              :label="config.name" 
+              :name="config.code || ''"
+            ></el-tab-pane>
           </el-tabs>
+          <div v-else style="padding: 20px; text-align: center; color: #999;">
+            加载分类配置中...
+          </div>
         </div>
         <div class="post-list" v-loading="loading">
           <el-card
@@ -84,10 +88,12 @@
         </el-form-item>
         <el-form-item label="分类" prop="category">
           <el-select v-model="postForm.category" placeholder="请选择分类">
-            <el-option label="分享" value="SHARE" />
-            <el-option label="求助" value="HELP" />
-            <el-option label="教程" value="TUTORIAL" />
-            <el-option label="公告" value="ANNOUNCEMENT" />
+            <el-option 
+              v-for="config in categoryConfigs.filter(c => c.code !== '')" 
+              :key="config.id"
+              :label="config.name" 
+              :value="config.code"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="内容" prop="content">
@@ -108,19 +114,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, onActivated } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { forumApi, type ForumPost, type PostForm } from '@/api/forum'
+import { categoryApi, type CategoryConfig } from '@/api/category'
 import { useUserStore } from '@/stores/user'
 import { View, Star, ChatLineRound } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const loading = ref(false)
 const postList = ref<ForumPost[]>([])
+const categoryConfigs = ref<CategoryConfig[]>([])
 const activeCategory = ref('')
 const page = ref(1)
 const pageSize = ref(10)
@@ -139,6 +148,43 @@ const postRules: FormRules = {
   title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
   category: [{ required: true, message: '请选择分类', trigger: 'change' }],
   content: [{ required: true, message: '请输入内容', trigger: 'blur' }]
+}
+
+const loadCategoryConfigs = async () => {
+  try {
+    const configs = await categoryApi.getEnabledConfigs('FORUM')
+    console.log('加载的论坛分类配置:', configs)
+    console.log('分类配置数量:', configs.length)
+    
+    // 确保数组被正确赋值
+    categoryConfigs.value = [...configs]
+    console.log('categoryConfigs.value:', categoryConfigs.value)
+    
+    // 设置默认选中的分类（isDefault=1的）
+    const defaultConfig = configs.find(c => c.isDefault === 1)
+    if (defaultConfig) {
+      activeCategory.value = defaultConfig.code || ''
+      console.log('设置默认分类:', activeCategory.value)
+    } else if (configs.length > 0) {
+      activeCategory.value = configs[0].code || ''
+      console.log('设置第一个分类:', activeCategory.value)
+    }
+    
+    console.log('最终activeCategory:', activeCategory.value)
+    console.log('最终categoryConfigs长度:', categoryConfigs.value.length)
+  } catch (error) {
+    console.error('加载分类配置失败:', error)
+    ElMessage.error('加载分类配置失败')
+    // 如果加载失败，使用默认配置
+    categoryConfigs.value = [
+      { id: 0, name: '全部', code: '', type: 'FORUM', sortOrder: 0, isDefault: 1, status: 1, createTime: '', updateTime: '' },
+      { id: 1, name: '分享', code: 'SHARE', type: 'FORUM', sortOrder: 1, isDefault: 0, status: 1, createTime: '', updateTime: '' },
+      { id: 2, name: '求助', code: 'HELP', type: 'FORUM', sortOrder: 2, isDefault: 0, status: 1, createTime: '', updateTime: '' },
+      { id: 3, name: '教程', code: 'TUTORIAL', type: 'FORUM', sortOrder: 3, isDefault: 0, status: 1, createTime: '', updateTime: '' },
+      { id: 4, name: '公告', code: 'ANNOUNCEMENT', type: 'FORUM', sortOrder: 4, isDefault: 0, status: 1, createTime: '', updateTime: '' }
+    ]
+    activeCategory.value = ''
+  }
 }
 
 const getCategoryType = (category: string) => {
@@ -209,8 +255,17 @@ const handleSubmitPost = async () => {
   })
 }
 
+// 组件激活时刷新数据（keep-alive 场景）
+onActivated(() => {
+  loadCategoryConfigs().then(() => {
+    loadPosts()
+  })
+})
+
 onMounted(() => {
-  loadPosts()
+  loadCategoryConfigs().then(() => {
+    loadPosts()
+  })
 })
 </script>
 
@@ -310,4 +365,8 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
 }
 </style>
+
+
+
+
 

@@ -8,15 +8,30 @@ export const useUserStore = defineStore('user', () => {
   const userInfo = ref<UserInfo | null>(null)
 
   const isLoggedIn = computed(() => !!token.value)
-  const isAdmin = computed(() => userInfo.value?.role === 'ADMIN')
+  // 检查是否有访问后台管理的权限（page:admin）
+  const isAdmin = computed(() => {
+    if (!userInfo.value) return false
+    // 兼容旧的角色判断，如果role是ADMIN也允许
+    if (userInfo.value.role === 'ADMIN') return true
+    // 检查是否有page:admin权限
+    return userInfo.value.permissions?.includes('page:admin') || false
+  })
+  
+  // 检查是否有特定权限
+  const hasPermission = (permissionCode: string) => {
+    if (!userInfo.value) return false
+    return userInfo.value.permissions?.includes(permissionCode) || false
+  }
 
   // 登录
   const login = async (form: LoginForm) => {
+    debugger
     try {
       const response = await userApi.login(form)
       token.value = response.token
-      userInfo.value = response.user
       localStorage.setItem('token', response.token)
+      // 登录后立即获取完整的用户信息（包括权限）
+      await fetchUserInfo()
       ElMessage.success('登录成功')
       return true
     } catch (error) {
@@ -29,8 +44,9 @@ export const useUserStore = defineStore('user', () => {
     try {
       const response = await userApi.register(form)
       token.value = response.token
-      userInfo.value = response.user
       localStorage.setItem('token', response.token)
+      // 注册后立即获取完整的用户信息（包括权限）
+      await fetchUserInfo()
       ElMessage.success('注册成功')
       return true
     } catch (error) {
@@ -40,6 +56,7 @@ export const useUserStore = defineStore('user', () => {
 
   // 获取用户信息
   const fetchUserInfo = async () => {
+    debugger;
     if (!token.value) return
     try {
       const info = await userApi.getUserInfo()
@@ -78,6 +95,7 @@ export const useUserStore = defineStore('user', () => {
     userInfo,
     isLoggedIn,
     isAdmin,
+    hasPermission,
     login,
     register,
     fetchUserInfo,
@@ -85,4 +103,8 @@ export const useUserStore = defineStore('user', () => {
     logout
   }
 })
+
+
+
+
 

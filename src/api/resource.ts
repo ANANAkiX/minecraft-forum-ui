@@ -74,3 +74,7 @@ export const resourceApi = {
   downloadResource: (id: number) => request.post(`/resource/${id}/download`)
 }
 
+
+
+
+

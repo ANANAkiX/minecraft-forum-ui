@@ -14,7 +14,7 @@
         >
           <el-menu-item index="home">首页</el-menu-item>
           <el-menu-item index="forum">论坛</el-menu-item>
-          <el-menu-item index="upload" v-if="userStore.isLoggedIn">上传资源</el-menu-item>
+          <el-menu-item index="upload" v-if="userStore.isLoggedIn && userStore.hasPermission('page:upload')">上传资源</el-menu-item>
           <el-menu-item index="admin" v-if="userStore.isAdmin">后台管理</el-menu-item>
         </el-menu>
         <div class="header-actions">
@@ -195,4 +195,8 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
 }
 </style>
+
+
+
+
 
