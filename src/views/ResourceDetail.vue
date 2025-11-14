@@ -19,9 +19,21 @@
             >
               {{ isFavorited ? '已收藏' : '收藏' }} {{ resource.favoriteCount }}
             </el-button>
-            <el-button type="primary" :icon="Download" @click="handleDownload">
-              下载 {{ resource.downloadCount }}
-            </el-button>
+            <el-tooltip
+              content="暂无下载权限，请联系管理员"
+              placement="top"
+              :disabled="hasDownloadPermission || files.length === 0"
+            >
+              <el-button 
+                type="primary" 
+                :icon="Download" 
+                @click="handleDownloadAll()"
+                :disabled="!hasDownloadPermission || files.length === 0"
+                :loading="downloadingAll"
+              >
+                下载所有文件 {{ files.length > 0 ? `(${files.length})` : '' }}
+              </el-button>
+            </el-tooltip>
           </div>
         </div>
       </template>
@@ -53,6 +65,35 @@
             {{ tag }}
           </el-tag>
         </div>
+        <div class="files" v-if="files.length > 0">
+          <h3>资源文件</h3>
+          <el-table :data="files" style="width: 100%">
+            <el-table-column prop="originalName" label="文件名">
+              <template #default="{ row }">
+                <el-tooltip
+                  content="暂无下载权限，请联系管理员"
+                  placement="top"
+                  :disabled="hasDownloadPermission"
+                >
+                  <span 
+                    class="file-name-link"
+                    :class="{ 'disabled': !hasDownloadPermission }"
+                    @click="handleDownloadSingle(row)"
+                    :title="hasDownloadPermission ? '点击下载' : '暂无下载权限，请联系管理员'"
+                  >
+                    {{ row.originalName }}
+                  </span>
+                </el-tooltip>
+              </template>
+            </el-table-column>
+            <el-table-column prop="fileSize" label="文件大小" width="120">
+              <template #default="{ row }">
+                {{ formatFileSize(row.fileSize) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="fileType" label="文件类型" width="120" />
+          </el-table>
+        </div>
         <div class="markdown-content" v-if="resource.content">
           <h3>详细介绍</h3>
           <div v-html="markdownToHtml(resource.content)"></div>
@@ -64,21 +105,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { resourceApi, type Resource } from '@/api/resource'
+import { fileApi, type SysFile } from '@/api/file'
 import { useUserStore } from '@/stores/user'
+import { usePageTitle } from '@/composables/usePageTitle'
 import { Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import MarkdownIt from 'markdown-it'
 
 const route = useRoute()
 const userStore = useUserStore()
+const pageTitle = usePageTitle()
 
 const loading = ref(false)
 const resource = ref<Resource | null>(null)
+const files = ref<SysFile[]>([])
 const isLiked = ref(false)
 const isFavorited = ref(false)
+const downloadingAll = ref(false)
+
+// 检查是否有下载权限
+const hasDownloadPermission = computed(() => {
+  return userStore.hasPermission('resource:download')
+})
 
 const md = new MarkdownIt()
 
@@ -97,6 +148,22 @@ const loadResource = async () => {
   loading.value = true
   try {
     resource.value = await resourceApi.getResourceById(id)
+    // 设置页面标题，保存ID用于跳转
+    if (resource.value) {
+      pageTitle.setResourceTitle(resource.value.title, resource.value.id)
+      
+      // 从后端返回的数据中获取点赞和收藏状态
+      isLiked.value = resource.value.isLiked ?? false
+      isFavorited.value = resource.value.isFavorited ?? false
+    }
+    
+    // 加载资源关联的文件列表
+    try {
+      files.value = await fileApi.getFilesByResourceId(id)
+    } catch (error) {
+      console.error('加载文件列表失败:', error)
+      files.value = []
+    }
   } catch (error) {
     ElMessage.error('加载资源失败')
   } finally {
@@ -150,28 +217,128 @@ const handleFavorite = async () => {
   }
 }
 
-const handleDownload = async () => {
+// 下载单个文件
+const handleDownloadSingle = async (file: SysFile) => {
   if (!userStore.isLoggedIn) {
     ElMessage.warning('请先登录')
     return
   }
   
-  if (!resource.value) return
+  // 检查下载权限
+  if (!hasDownloadPermission.value) {
+    ElMessage.warning('暂无下载权限，请联系管理员')
+    return
+  }
+  
+  if (!resource.value || !file || !file.id) {
+    ElMessage.warning('文件不存在')
+    return
+  }
   
   try {
+    // 先记录下载日志（只记录一次）
     await resourceApi.downloadResource(resource.value.id)
     if (resource.value) resource.value.downloadCount++
+    
+    // 通过后端接口下载文件
+    const blob = await fileApi.downloadFile(file.id)
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = file.originalName || 'download'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
     ElMessage.success('下载成功')
-    // 实际下载文件
-    if (resource.value.fileUrl) {
-      window.open(resource.value.fileUrl, '_blank')
-    }
-  } catch (error) {
-    ElMessage.error('下载失败')
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.message || error.message || '下载失败'
+    ElMessage.error(errorMessage)
+    console.error('下载失败:', error)
   }
 }
 
+// 下载所有文件
+const handleDownloadAll = async () => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  
+  // 检查下载权限
+  if (!hasDownloadPermission.value) {
+    ElMessage.warning('暂无下载权限，请联系管理员')
+    return
+  }
+  
+  if (!resource.value || files.value.length === 0) {
+    ElMessage.warning('没有可下载的文件')
+    return
+  }
+  
+  downloadingAll.value = true
+  
+  try {
+    // 先记录下载日志（只记录一次）
+    await resourceApi.downloadResource(resource.value.id)
+    if (resource.value) resource.value.downloadCount++
+    
+    // 依次下载所有文件
+    for (let i = 0; i < files.value.length; i++) {
+      const file = files.value[i]
+      if (!file || !file.id) continue
+      
+      try {
+        // 通过后端接口下载文件
+        const blob = await fileApi.downloadFile(file.id)
+        
+        // 创建下载链接
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = file.originalName || `file-${i + 1}`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        
+        // 添加小延迟，避免浏览器阻止多个下载
+        if (i < files.value.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 300))
+        }
+      } catch (error: any) {
+        console.error(`下载文件 ${file.originalName} 失败:`, error)
+        ElMessage.warning(`文件 ${file.originalName} 下载失败`)
+      }
+    }
+    
+    ElMessage.success(`成功下载 ${files.value.length} 个文件`)
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.message || error.message || '下载失败'
+    ElMessage.error(errorMessage)
+    console.error('批量下载失败:', error)
+  } finally {
+    downloadingAll.value = false
+  }
+}
+
+const formatFileSize = (bytes: number) => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+}
+
 onMounted(() => {
+  loadResource()
+})
+
+// 监听路由参数变化，当切换不同资源时更新标题
+watch(() => route.params.id, () => {
   loadResource()
 })
 </script>
@@ -224,8 +391,16 @@ onMounted(() => {
 
 .description h3,
 .tags h3,
+.files h3,
 .markdown-content h3 {
   margin-bottom: 12px;
+}
+
+.files {
+  margin-bottom: 24px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--el-border-color-light);
 }
 
 .tags {
@@ -262,7 +437,31 @@ onMounted(() => {
   border-radius: 4px;
   overflow-x: auto;
 }
+
+.file-name-link {
+  color: var(--el-color-primary);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.3s;
+}
+
+.file-name-link:hover {
+  color: var(--el-color-primary-light-3);
+  text-decoration: underline;
+}
+
+.file-name-link.disabled {
+  color: var(--el-text-color-disabled);
+  cursor: not-allowed;
+}
+
+.file-name-link.disabled:hover {
+  color: var(--el-text-color-disabled);
+  text-decoration: none;
+}
 </style>
+
+
 
 
 

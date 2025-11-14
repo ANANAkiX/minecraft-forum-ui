@@ -1,5 +1,6 @@
 import {createRouter, createWebHistory} from 'vue-router'
 import {useUserStore} from '@/stores/user'
+import {ElMessage} from 'element-plus'
 import type {RouteRecordRaw} from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
@@ -13,7 +14,7 @@ const routes: RouteRecordRaw[] = [
                 path: 'home',
                 name: 'Home',
                 component: () => import('@/views/Home.vue'),
-                meta: {title: '首页'}
+                meta: {title: '首页', requiresPermission: 'page:home'}
             },
             {
                 path: 'resource/:id',
@@ -25,13 +26,13 @@ const routes: RouteRecordRaw[] = [
                 path: 'upload',
                 name: 'Upload',
                 component: () => import('@/views/Upload.vue'),
-                meta: {title: '上传资源', requiresAuth: true}
+                meta: {title: '上传资源', requiresAuth: true, requiresPermission: 'page:upload'}
             },
             {
                 path: 'forum',
                 name: 'Forum',
                 component: () => import('@/views/Forum.vue'),
-                meta: {title: '论坛'}
+                meta: {title: '论坛', requiresPermission: 'page:forum'}
             },
             {
                 path: 'forum/post/:id',
@@ -49,7 +50,7 @@ const routes: RouteRecordRaw[] = [
                 path: 'admin',
                 name: 'Admin',
                 component: () => import('@/views/Admin.vue'),
-                meta: {title: '后台管理', requiresAuth: true, requiresAdmin: true}
+                meta: {title: '后台管理', requiresAuth: true, requiresPermission: 'page:admin'}
             }
         ]
     },
@@ -79,19 +80,74 @@ const router = createRouter({
 })
 
 // @ts-ignore
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
     const userStore = useUserStore()
 
+    // 如果配置信息还未加载，先加载配置
+    if (userStore.anonymousAccess === undefined || (to.name === 'Home' || to.name === 'Forum')) {
+        await userStore.fetchSystemConfig()
+    }
+
+    // 检查是否需要登录
     if (to.meta.requiresAuth && !userStore.isLoggedIn) {
         next({name: 'Login', query: {redirect: to.fullPath}})
-    } else if (to.meta.requiresAdmin && !userStore.isAdmin) {
-        next({name: 'Home'})
-    } else {
-        next()
+        return
     }
+
+    // 检查页面权限（基于用户角色权限）
+    if (to.meta.requiresPermission) {
+        const permission = to.meta.requiresPermission as string
+        
+        // 如果允许匿名访问，且访问的是首页或论坛，则跳过权限检查
+        if (userStore.anonymousAccess && (to.name === 'Home' || to.name === 'Forum')) {
+            next()
+            return
+        }
+        
+        // 如果用户已登录，确保权限已从JWT中提取
+        if (userStore.isLoggedIn && userStore.permissions.length === 0) {
+            // 权限还未提取，立即提取（这不应该发生，但作为安全措施）
+            const token = localStorage.getItem('token')
+            if (token) {
+                // 重新提取权限
+                userStore.extractInfoFromToken()
+            }
+        }
+        
+        // 检查权限 - 必须严格检查，无权限则拒绝访问
+        if (!userStore.hasPermission(permission)) {
+            // 如果没有权限，只在非登录页时显示提示并重定向（避免重复消息）
+            if (to.name !== 'Login') {
+                // 如果是从其他页面跳转过来的，显示提示
+                if (from.name && from.name !== 'Login') {
+                    ElMessage.warning('您没有访问此页面的权限')
+                }
+                next({name: 'Login', query: {redirect: to.fullPath}})
+            } else {
+                // 如果已经在登录页，直接阻止访问，不显示消息
+                next(false)
+            }
+            return
+        }
+    }
+
+    // 兼容旧的 requiresAdmin 检查（使用 page:admin 权限）
+    if (to.meta.requiresAdmin && !userStore.hasPermission('page:admin')) {
+        ElMessage.warning('您没有访问后台管理的权限')
+        // 避免循环重定向：如果Home也需要权限，则跳转到登录页
+        if (to.name !== 'Login') {
+            next({name: 'Login', query: {redirect: to.fullPath}})
+        } else {
+            next(false)
+        }
+        return
+    }
+
+    next()
 })
 
 export default router
+
 
 
 

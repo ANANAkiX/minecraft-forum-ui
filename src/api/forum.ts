@@ -38,6 +38,7 @@ export interface ForumPost {
   createTime: string
   updateTime: string
   comments?: Comment[]
+  isLiked?: boolean // 当前用户是否已点赞
 }
 
 export interface PostListParams {
@@ -45,6 +46,8 @@ export interface PostListParams {
   pageSize?: number
   category?: string
   keyword?: string
+  authorKeyword?: string
+  sortBy?: string // createTime, viewCount, likeCount
 }
 
 export interface PostListResponse {
@@ -76,6 +79,7 @@ export const forumApi = {
   likeComment: (commentId: number) => request.post(`/forum/comments/${commentId}/like`),
   likeReply: (replyId: number) => request.post(`/forum/replies/${replyId}/like`)
 }
+
 
 
 

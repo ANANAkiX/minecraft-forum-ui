@@ -1,116 +1,56 @@
 <template>
   <div class="upload-page">
-    <el-card>
-      <template #header>
-        <h2>上传资源</h2>
-      </template>
-      <el-form
-        :model="form"
-        :rules="rules"
-        ref="formRef"
-        label-width="100px"
-      >
-        <el-form-item label="标题" prop="title">
-          <el-input v-model="form.title" placeholder="请输入资源标题" />
-        </el-form-item>
-        <el-form-item label="简介" prop="description">
-          <el-input
-            v-model="form.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入资源简介"
-          />
-        </el-form-item>
-        <el-form-item label="分类" prop="category">
-          <el-select v-model="form.category" placeholder="请选择分类">
-            <el-option label="整合包" value="PACK" />
-            <el-option label="MOD" value="MOD" />
-            <el-option label="资源包" value="RESOURCE" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="版本" prop="version">
-          <el-input v-model="form.version" placeholder="例如：1.20.1" />
-        </el-form-item>
-        <el-form-item label="标签" prop="tags">
-          <el-select
-            v-model="form.tags"
-            multiple
-            filterable
-            allow-create
-            placeholder="选择或输入标签"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="tag in commonTags"
-              :key="tag"
-              :label="tag"
-              :value="tag"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="详细内容" prop="content">
-          <div class="editor-wrapper">
-            <v-md-editor
-              v-model="form.content"
-              height="400px"
-              left-toolbar="undo redo clear | h bold italic strikethrough quote | ul ol table hr | link image code | save"
-              right-toolbar="preview toc sync-scroll"
-            />
-          </div>
-        </el-form-item>
-        <el-form-item label="资源文件" prop="file">
-          <el-upload
-            class="upload-demo"
-            drag
-            :auto-upload="false"
-            :on-change="handleFileChange"
-            :file-list="fileList"
-            :limit="1"
-          >
-            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-            <div class="el-upload__text">
-              将文件拖到此处，或<em>点击上传</em>
-            </div>
-            <template #tip>
-              <div class="el-upload__tip">
-                支持 zip、rar、jar 等格式，文件大小不超过 500MB
-              </div>
-            </template>
-          </el-upload>
-        </el-form-item>
+    <ResourceForm
+      ref="resourceFormRef"
+      title="上传资源"
+      v-model="form"
+      :file-list="fileList"
+      @file-change="handleFileChange"
+      @file-remove="handleFileRemove"
+      @image-upload="handleImageUpload"
+      @validate="handleValidate"
+      @reset="handleReset"
+    >
+      <template #actions>
         <el-form-item>
-          <el-button type="primary" @click="handleSubmit" :loading="loading">
-            提交
+          <el-button type="primary" @click="handleSubmit" :loading="loading || uploading">
+            {{ uploading ? '上传文件中...' : '提交' }}
           </el-button>
-          <el-button @click="handleReset">重置</el-button>
+          <el-button @click="handleReset" :disabled="loading || uploading">重置</el-button>
         </el-form-item>
-      </el-form>
-    </el-card>
+      </template>
+    </ResourceForm>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { resourceApi } from '@/api/resource'
-import type { FormInstance, FormRules, UploadFile } from 'element-plus'
-import { UploadFilled } from '@element-plus/icons-vue'
+import { fileApi } from '@/api/file'
+import type { UploadFile } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import VMdEditor from '@kangc/v-md-editor'
-import '@kangc/v-md-editor/lib/style/base-editor.css'
-import githubTheme from '@kangc/v-md-editor/lib/theme/github.js'
-import '@kangc/v-md-editor/lib/theme/style/github.css'
-import Prism from 'prismjs'
+import { useUserStore } from '@/stores/user'
+import ResourceForm from '@/components/ResourceForm.vue'
 
 const router = useRouter()
+const userStore = useUserStore()
+const resourceFormRef = ref<any>(null)
 
-VMdEditor.use(githubTheme, {
-  Prism
+// 页面级权限检查：如果没有page:upload权限，重定向到登录页
+onMounted(() => {
+  if (!userStore.isLoggedIn || !userStore.hasPermission('page:upload')) {
+    ElMessage.warning('您没有访问上传资源页面的权限')
+    router.push({name: 'Login'})
+    return
+  }
 })
 
-const formRef = ref<FormInstance>()
 const loading = ref(false)
+const uploading = ref(false)
 const fileList = ref<UploadFile[]>([])
+const uploadedFileUrls = ref<string[]>([]) // 存储已上传的文件URL
+const formFiles = ref<File[]>([]) // 存储新上传的文件
 const form = reactive({
   title: '',
   description: '',
@@ -118,47 +58,150 @@ const form = reactive({
   version: '',
   tags: [] as string[],
   content: '',
-  file: null as File | null
+  status: 'PENDING'
 })
 
-const commonTags = ['生存', '创造', 'PVP', 'PVE', 'RPG', '冒险', '建筑', '红石', '模组', '插件']
-
-const rules: FormRules = {
-  title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
-  description: [{ required: true, message: '请输入简介', trigger: 'blur' }],
-  category: [{ required: true, message: '请选择分类', trigger: 'change' }],
-  version: [{ required: true, message: '请输入版本', trigger: 'blur' }],
-  content: [{ required: true, message: '请输入详细内容', trigger: 'blur' }],
-  file: [{ required: true, message: '请上传文件', trigger: 'change' }]
+const handleFileChange = (files: File[]) => {
+  formFiles.value = files
 }
 
-const handleFileChange = (file: UploadFile) => {
-  form.file = file.raw as File
+const handleFileRemove = (file: UploadFile) => {
+  // 从文件列表中移除
+  if (file.raw) {
+    formFiles.value = formFiles.value.filter(f => f !== file.raw)
+  }
+}
+
+// 处理富文本编辑器图片上传
+const handleImageUpload = async (_event: any, insertImage: any, files: FileList | File[]) => {
+  uploading.value = true
+  try {
+    const fileArray = Array.from(files)
+    const uploadPromises = fileArray.map(file => fileApi.uploadFile(file))
+    const results = await Promise.all(uploadPromises)
+    
+    results.forEach(result => {
+      insertImage({
+        url: result.url,
+        desc: result.name || '图片'
+      })
+    })
+    
+    ElMessage.success(`成功上传 ${results.length} 张图片`)
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.message || error.message || '图片上传失败'
+    ElMessage.error(errorMessage)
+  } finally {
+    uploading.value = false
+  }
+}
+
+const handleValidate = (callback: (valid: boolean) => void) => {
+  if (!resourceFormRef.value) {
+    callback(false)
+    return
+  }
+  
+  resourceFormRef.value.validate((valid: boolean) => {
+    if (valid) {
+      // 检查是否有文件需要上传
+      if (formFiles.value.length === 0) {
+        ElMessage.warning('请至少上传一个资源文件')
+        callback(false)
+        return
+      }
+    }
+    callback(valid)
+  })
 }
 
 const handleSubmit = async () => {
-  if (!formRef.value) return
+  if (!resourceFormRef.value) return
   
-  await formRef.value.validate(async (valid) => {
-    if (valid) {
-      loading.value = true
-      try {
-        await resourceApi.createResource(form)
-        ElMessage.success('上传成功')
-        router.push('/')
-      } catch (error) {
-        ElMessage.error('上传失败')
-      } finally {
-        loading.value = false
+  resourceFormRef.value.validate(async (valid: boolean) => {
+    if (!valid) return
+    
+    // 检查是否有文件需要上传
+    if (formFiles.value.length === 0) {
+      ElMessage.warning('请至少上传一个资源文件')
+      return
+    }
+    
+    // 从 ResourceForm 组件获取最新的表单数据
+    const formData = resourceFormRef.value?.form || form
+    
+    loading.value = true
+    uploading.value = true
+    try {
+      // 第一步：先创建资源，获取资源ID
+      ElMessage.info('正在创建资源...')
+      
+      // 确保使用最新的表单数据
+      const resourceData = {
+        title: formData.title || '',
+        description: formData.description || '',
+        content: formData.content || '',
+        category: formData.category || '',
+        version: formData.version || '',
+        tags: formData.tags || []
       }
+      
+      console.log('提交的资源数据:', resourceData) // 调试用
+      
+      // 验证必填字段
+      if (!resourceData.title || !resourceData.description || !resourceData.category || 
+          !resourceData.version || !resourceData.content) {
+        ElMessage.error('请填写完整的资源信息')
+        loading.value = false
+        uploading.value = false
+        return
+      }
+      
+      const createdResource = await resourceApi.createResource(resourceData)
+      const resourceId = createdResource.id
+      
+      if (!resourceId) {
+        ElMessage.error('创建资源失败，未获取到资源ID')
+        return
+      }
+      
+      // 第二步：上传所有文件到OSS，并关联资源ID
+      ElMessage.info('正在上传文件...')
+      const uploadResults = await fileApi.uploadFiles(formFiles.value, resourceId)
+      uploadedFileUrls.value = uploadResults.map(r => r.url)
+      
+      if (uploadResults.length === 0) {
+        ElMessage.error('文件上传失败，未获取到文件URL')
+        return
+      }
+      
+      ElMessage.success('资源上传成功！')
+      router.push('/')
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || '上传失败'
+      ElMessage.error(errorMessage)
+      console.error('上传失败:', error)
+    } finally {
+      loading.value = false
+      uploading.value = false
     }
   })
 }
 
 const handleReset = () => {
-  formRef.value?.resetFields()
+  resourceFormRef.value?.resetFields()
   fileList.value = []
-  form.file = null
+  formFiles.value = []
+  uploadedFileUrls.value = []
+  Object.assign(form, {
+    title: '',
+    description: '',
+    category: '',
+    version: '',
+    tags: [],
+    content: '',
+    status: 'PENDING'
+  })
 }
 </script>
 

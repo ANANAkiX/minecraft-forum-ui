@@ -33,6 +33,7 @@ export interface TokenResponse {
 export const userApi = {
   login: (data: LoginForm) => request.post<TokenResponse>('/auth/login', data),
   register: (data: RegisterForm) => request.post<TokenResponse>('/auth/register', data),
+  refreshToken: () => request.post<TokenResponse>('/auth/refresh'),
   getUserInfo: () => request.get<UserInfo>('/user/info'),
   updateUserInfo: (data: Partial<UserInfo>) => request.put('/user/info', data),
   uploadAvatar: (file: File) => {

@@ -61,7 +61,7 @@
             <div class="card-header">
               <h3>发帖</h3>
               <el-button
-                v-if="userStore.isLoggedIn"
+                v-if="userStore.isLoggedIn && userStore.hasPermission('post:create')"
                 type="primary"
                 size="small"
                 @click="showPostDialog = true"
@@ -127,6 +127,25 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 
+// 页面级权限检查：如果没有page:forum权限且不允许匿名访问，重定向到登录页
+onMounted(async () => {
+  // 如果配置信息还未加载，先加载配置
+  if (userStore.anonymousAccess === undefined) {
+    await userStore.fetchSystemConfig()
+  }
+  
+  // 如果允许匿名访问，跳过权限检查
+  if (userStore.anonymousAccess) {
+    return
+  }
+  
+  // 如果不允许匿名访问，检查权限
+  if (!userStore.hasPermission('page:forum')) {
+    ElMessage.warning('您没有访问论坛页面的权限')
+    router.push({name: 'Login'})
+  }
+})
+
 const loading = ref(false)
 const postList = ref<ForumPost[]>([])
 const categoryConfigs = ref<CategoryConfig[]>([])
@@ -153,27 +172,19 @@ const postRules: FormRules = {
 const loadCategoryConfigs = async () => {
   try {
     const configs = await categoryApi.getEnabledConfigs('FORUM')
-    console.log('加载的论坛分类配置:', configs)
-    console.log('分类配置数量:', configs.length)
     
     // 确保数组被正确赋值
     categoryConfigs.value = [...configs]
-    console.log('categoryConfigs.value:', categoryConfigs.value)
     
     // 设置默认选中的分类（isDefault=1的）
     const defaultConfig = configs.find(c => c.isDefault === 1)
     if (defaultConfig) {
       activeCategory.value = defaultConfig.code || ''
-      console.log('设置默认分类:', activeCategory.value)
     } else if (configs.length > 0) {
       activeCategory.value = configs[0].code || ''
-      console.log('设置第一个分类:', activeCategory.value)
     }
     
-    console.log('最终activeCategory:', activeCategory.value)
-    console.log('最终categoryConfigs长度:', categoryConfigs.value.length)
   } catch (error) {
-    console.error('加载分类配置失败:', error)
     ElMessage.error('加载分类配置失败')
     // 如果加载失败，使用默认配置
     categoryConfigs.value = [
@@ -236,6 +247,12 @@ const goToPost = (id: number) => {
 
 const handleSubmitPost = async () => {
   if (!postFormRef.value) return
+  
+  // 检查权限
+  if (!userStore.hasPermission('post:create')) {
+    ElMessage.error('您没有发布帖子的权限')
+    return
+  }
   
   await postFormRef.value.validate(async (valid) => {
     if (valid) {

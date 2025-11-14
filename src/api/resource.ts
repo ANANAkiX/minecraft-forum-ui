@@ -14,11 +14,12 @@ export interface Resource {
   downloadCount: number
   likeCount: number
   favoriteCount: number
-  fileUrl: string
   thumbnailUrl: string
   status: string
   createTime: string
   updateTime: string
+  isLiked?: boolean // 当前用户是否已点赞
+  isFavorited?: boolean // 当前用户是否已收藏
 }
 
 export interface ResourceListParams {
@@ -50,17 +51,18 @@ export interface ResourceForm {
 export const resourceApi = {
   getResourceList: (params: ResourceListParams) => request.get<ResourceListResponse>('/resource/list', { params }),
   getResourceById: (id: number) => request.get<Resource>(`/resource/${id}`),
-  createResource: (data: ResourceForm) => {
+  createResource: (data: ResourceForm | any) => {
+    // 始终使用 FormData 格式，因为后端接口使用 @RequestParam
     const formData = new FormData()
     formData.append('title', data.title)
     formData.append('description', data.description)
     formData.append('content', data.content)
     formData.append('category', data.category)
     formData.append('version', data.version)
-    formData.append('tags', JSON.stringify(data.tags))
-    if (data.file) {
-      formData.append('file', data.file)
-    }
+    formData.append('tags', JSON.stringify(data.tags || []))
+    
+    // 注意：不再传递文件或 fileUrl，文件通过文件接口单独上传并关联资源ID
+    
     return request.post<Resource>('/resource', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
@@ -73,6 +75,9 @@ export const resourceApi = {
   unfavoriteResource: (id: number) => request.delete(`/resource/${id}/favorite`),
   downloadResource: (id: number) => request.post(`/resource/${id}/download`)
 }
+
+
+
 
 
 

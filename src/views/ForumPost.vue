@@ -109,16 +109,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { forumApi, type ForumPost } from '@/api/forum'
 import { useUserStore } from '@/stores/user'
+import { usePageTitle } from '@/composables/usePageTitle'
 import { Star } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import MarkdownIt from 'markdown-it'
 
 const route = useRoute()
 const userStore = useUserStore()
+const pageTitle = usePageTitle()
 
 const loading = ref(false)
 const post = ref<ForumPost | null>(null)
@@ -157,6 +159,12 @@ const loadPost = async () => {
   loading.value = true
   try {
     post.value = await forumApi.getPostById(id)
+    // 设置页面标题，保存ID用于跳转
+    if (post.value) {
+      pageTitle.setPostTitle(post.value.title, post.value.id)
+      // 从后端数据中获取点赞状态
+      isLiked.value = post.value.isLiked ?? false
+    }
   } catch (error) {
     ElMessage.error('加载帖子失败')
   } finally {
@@ -241,6 +249,11 @@ const handleLikeComment = async (commentId: number) => {
 }
 
 onMounted(() => {
+  loadPost()
+})
+
+// 监听路由参数变化，当切换不同帖子时更新标题
+watch(() => route.params.id, () => {
   loadPost()
 })
 </script>
@@ -353,6 +366,8 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
 }
 </style>
+
+
 
 
 
