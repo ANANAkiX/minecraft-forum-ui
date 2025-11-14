@@ -34,11 +34,22 @@ export interface Permission {
   name: string
   type: string
   description: string
+  router?: string // 访问权限的路由地址
+  apiurl?: string // 操作权限的API地址
+  methodtype?: string // 请求方式(GET/POST/PUT/DELETE)
   parentId: number
   sortOrder: number
   status: number
   createTime: string
   updateTime: string
+}
+
+export interface ApiInfo {
+  url: string
+  method: string
+  description: string
+  summary: string
+  displayName?: string
 }
 
 export interface SysFile {
@@ -140,6 +151,8 @@ export const adminApi = {
   updatePermission: (id: number, permission: Partial<Permission>) => 
     request.put<Permission>(`/admin/permissions/${id}`, permission),
   deletePermission: (id: number) => 
-    request.delete(`/admin/permissions/${id}`)
+    request.delete(`/admin/permissions/${id}`),
+  getAllApis: () => 
+    request.get<ApiInfo[]>('/admin/apis')
 }
 

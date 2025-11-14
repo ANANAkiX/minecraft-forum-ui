@@ -16,7 +16,7 @@
       <el-button 
         type="primary" 
         @click="handleAddUser"
-        v-if="userStore.hasPermission('admin:user:create') || userStore.hasPermission('admin:user:manage')"
+        v-if="userStore.hasPermission('admin:user:create')"
       >
         添加用户
       </el-button>
@@ -26,19 +26,6 @@
       <el-table-column prop="username" label="用户名" align="center" />
       <el-table-column prop="nickname" label="昵称" align="center" />
       <el-table-column prop="email" label="邮箱" align="center" />
-      <el-table-column prop="role" label="角色" width="120" align="center">
-        <template #default="scope">
-          <el-select 
-            v-model="scope.row.role" 
-            size="small" 
-            @change="handleRoleChange(scope.row)"
-            style="width: 100px"
-          >
-            <el-option label="用户" value="USER" />
-            <el-option label="管理员" value="ADMIN" />
-          </el-select>
-        </template>
-      </el-table-column>
       <el-table-column prop="status" label="状态" width="100" align="center">
         <template #default="scope">
           <el-switch
@@ -62,14 +49,14 @@
             <el-button 
               size="small" 
               @click="handleEditUser(scope.row)"
-              v-if="userStore.hasPermission('admin:user:update') || userStore.hasPermission('admin:user:manage')"
+              v-if="userStore.hasPermission('admin:user:update')"
             >
               编辑
             </el-button>
             <el-button 
               size="small" 
               @click="handleManageRoles(scope.row)"
-              v-if="userStore.hasPermission('admin:user:manage') || userStore.hasPermission('admin:role:manage')"
+              v-if="userStore.hasPermission('admin:user:update')"
             >
               角色管理
             </el-button>
@@ -77,7 +64,7 @@
               size="small" 
               type="danger" 
               @click="handleDeleteUser(scope.row.id)"
-              v-if="userStore.hasPermission('admin:user:delete') || userStore.hasPermission('admin:user:manage')"
+              v-if="userStore.hasPermission('admin:user:delete')"
             >
               删除
             </el-button>
@@ -115,12 +102,6 @@
         </el-form-item>
         <el-form-item label="邮箱" required>
           <el-input v-model="userForm.email" placeholder="请输入邮箱" />
-        </el-form-item>
-        <el-form-item label="角色">
-          <el-select v-model="userForm.role" style="width: 100%">
-            <el-option label="用户" value="USER" />
-            <el-option label="管理员" value="ADMIN" />
-          </el-select>
         </el-form-item>
         <el-form-item label="状态">
           <el-switch v-model="userForm.status" :active-value="0" :inactive-value="1" />
@@ -165,7 +146,7 @@ const userForm = ref<Partial<User>>({
 })
 
 const loadUsers = async () => {
-  if (!userStore.hasPermission('admin:user:read') && !userStore.hasPermission('admin:user:manage')) {
+  if (!userStore.hasPermission('admin:user:read')) {
     return
   }
   loading.value = true
@@ -189,23 +170,8 @@ const handlePageSizeChange = () => {
   loadUsers()
 }
 
-const handleRoleChange = async (user: User) => {
-  if (!userStore.hasPermission('admin:user:update') && !userStore.hasPermission('admin:user:manage')) {
-    ElMessage.error('无权限执行此操作')
-    await loadUsers()
-    return
-  }
-  try {
-    await adminApi.updateUserRole(user.id, user.role)
-    ElMessage.success('角色更新成功')
-  } catch (error) {
-    ElMessage.error('角色更新失败')
-    await loadUsers()
-  }
-}
-
 const handleStatusChange = async (user: User) => {
-  if (!userStore.hasPermission('admin:user:update') && !userStore.hasPermission('admin:user:manage')) {
+  if (!userStore.hasPermission('admin:user:update')) {
     ElMessage.error('无权限执行此操作')
     await loadUsers()
     return
@@ -220,7 +186,7 @@ const handleStatusChange = async (user: User) => {
 }
 
 const handleAddUser = () => {
-  if (!userStore.hasPermission('admin:user:create') && !userStore.hasPermission('admin:user:manage')) {
+  if (!userStore.hasPermission('admin:user:create')) {
     ElMessage.error('无权限执行此操作')
     return
   }
@@ -229,14 +195,13 @@ const handleAddUser = () => {
     username: '',
     nickname: '',
     email: '',
-    role: 'USER',
     status: 0
   }
   userEditDialogVisible.value = true
 }
 
 const handleEditUser = (user: User) => {
-  if (!userStore.hasPermission('admin:user:update') && !userStore.hasPermission('admin:user:manage')) {
+  if (!userStore.hasPermission('admin:user:update')) {
     ElMessage.error('无权限执行此操作')
     return
   }
@@ -246,7 +211,6 @@ const handleEditUser = (user: User) => {
     username: user.username,
     nickname: user.nickname,
     email: user.email,
-    role: user.role,
     status: user.status
   }
   userEditDialogVisible.value = true
@@ -260,14 +224,13 @@ const handleSaveUser = async () => {
   
   try {
     if (userForm.value.id) {
-      if (!userStore.hasPermission('admin:user:update') && !userStore.hasPermission('admin:user:manage')) {
+      if (!userStore.hasPermission('admin:user:update')) {
         ElMessage.error('无权限执行此操作')
         return
       }
       await adminApi.updateUserInfo(userForm.value.id, {
         nickname: userForm.value.nickname,
         email: userForm.value.email,
-        role: userForm.value.role,
         status: userForm.value.status
       })
       ElMessage.success('用户更新成功')
@@ -282,7 +245,7 @@ const handleSaveUser = async () => {
 }
 
 const handleDeleteUser = async (_userId: number) => {
-  if (!userStore.hasPermission('admin:user:delete') && !userStore.hasPermission('admin:user:manage')) {
+  if (!userStore.hasPermission('admin:user:delete')) {
     ElMessage.error('无权限执行此操作')
     return
   }
@@ -300,7 +263,7 @@ const handleDeleteUser = async (_userId: number) => {
 }
 
 const handleManageRoles = (user: User) => {
-  if (!userStore.hasPermission('admin:user:manage') && !userStore.hasPermission('admin:role:manage')) {
+  if (!userStore.hasPermission('admin:user:update')) {
     ElMessage.error('无权限执行此操作')
     return
   }
@@ -309,7 +272,7 @@ const handleManageRoles = (user: User) => {
 }
 
 onMounted(() => {
-  if (userStore.hasPermission('admin:user:read') || userStore.hasPermission('admin:user:manage')) {
+  if (userStore.hasPermission('admin:user:read')) {
     loadUsers()
   }
 })

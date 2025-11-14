@@ -1,27 +1,27 @@
 <template>
   <div class="admin-page" v-if="userStore.hasPermission('page:admin')">
     <el-tabs v-model="activeTab">
-      <!-- 用户管理：需要 admin:user:read 或 admin:user:manage 权限 -->
+      <!-- 用户管理：需要 admin:user:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="用户管理" name="users" v-if="canAccessUserManagement">
         <UserManagement />
       </el-tab-pane>
       
-      <!-- 资源管理：需要 admin:resource:manage 权限 -->
+      <!-- 资源管理：需要 admin:resource:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="资源管理" name="resources" v-if="canAccessResourceManagement">
         <ResourceManagement />
       </el-tab-pane>
       
-      <!-- 帖子管理：需要 admin:post:manage 权限 -->
+      <!-- 帖子管理：需要 admin:post:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="帖子管理" name="posts" v-if="canAccessPostManagement">
         <PostManagement />
       </el-tab-pane>
       
-      <!-- 角色管理：需要 admin:role:read 或 admin:role:manage 权限 -->
+      <!-- 角色管理：需要 admin:role:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="角色管理" name="roles" v-if="canAccessRoleManagement">
         <RoleManagement />
       </el-tab-pane>
       
-      <!-- 分类配置：需要 admin:category:manage 权限 -->
+      <!-- 分类配置：需要 admin:category:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="分类配置" name="categories" v-if="canAccessCategoryManagement">
         <CategoryManagement />
       </el-tab-pane>
@@ -31,7 +31,7 @@
         <FileManagement />
       </el-tab-pane>
       
-      <!-- 权限管理：需要 admin:permission:read 或 admin:permission:manage 权限 -->
+      <!-- 权限管理：需要 admin:permission:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="权限管理" name="permissions" v-if="canAccessPermissionManagement">
         <PermissionManagement />
       </el-tab-pane>
@@ -64,8 +64,11 @@ onMounted(() => {
 })
 
 // 权限检查计算属性 - 统一管理所有权限检查逻辑
+// 注意：这6个权限（admin:user:manage, admin:resource:manage, admin:post:manage, 
+// admin:role:manage, admin:category:manage, admin:permission:manage）只控制导航标签的显示
+// 页面内的CRUD操作由具体的操作权限控制（如admin:user:create, admin:user:update等）
 const canAccessUserManagement = computed(() => {
-  return userStore.hasPermission('admin:user:read') || userStore.hasPermission('admin:user:manage')
+  return userStore.hasPermission('admin:user:manage')
 })
 
 const canAccessResourceManagement = computed(() => {
@@ -77,7 +80,7 @@ const canAccessPostManagement = computed(() => {
 })
 
 const canAccessRoleManagement = computed(() => {
-  return userStore.hasPermission('admin:role:read') || userStore.hasPermission('admin:role:manage')
+  return userStore.hasPermission('admin:role:manage')
 })
 
 const canAccessCategoryManagement = computed(() => {
@@ -89,7 +92,7 @@ const canAccessFileManagement = computed(() => {
 })
 
 const canAccessPermissionManagement = computed(() => {
-  return userStore.hasPermission('admin:permission:read') || userStore.hasPermission('admin:permission:manage')
+  return userStore.hasPermission('admin:permission:manage')
 })
 
 // 根据权限设置默认激活的标签页

@@ -13,7 +13,7 @@
         title="编辑资源"
         v-model="form"
         :file-list="fileList"
-        :show-status="userStore.hasPermission('admin:resource:manage')"
+        :show-status="userStore.hasPermission('admin:resource:update')"
         @file-change="handleFileChange"
         @file-remove="handleFileRemove"
         @image-upload="handleImageUpload"
@@ -208,7 +208,7 @@ const handleSave = async () => {
         content: form.value.content
       }
       
-      if (userStore.hasPermission('admin:resource:manage')) {
+      if (userStore.hasPermission('admin:resource:update')) {
         updateData.status = form.value.status
       }
       

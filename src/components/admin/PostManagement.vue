@@ -64,7 +64,7 @@
             <el-button 
               size="small" 
               @click.stop="handleEditPost(scope.row)"
-              v-if="userStore.hasPermission('admin:post:manage')"
+              v-if="userStore.hasPermission('admin:post:update')"
             >
               编辑
             </el-button>
@@ -72,7 +72,7 @@
               size="small" 
               type="danger" 
               @click.stop="handleDeletePost(scope.row.id)"
-              v-if="userStore.hasPermission('admin:post:manage')"
+              v-if="userStore.hasPermission('admin:post:delete')"
             >
               删除
             </el-button>
@@ -127,7 +127,7 @@ const editDialogVisible = ref(false)
 const currentPost = ref<any>(null)
 
 const loadPosts = async () => {
-  if (!userStore.hasPermission('admin:post:manage')) {
+  if (!userStore.hasPermission('admin:post:read')) {
     return
   }
   loading.value = true
@@ -192,7 +192,7 @@ const handleDeletePost = async (id: number) => {
 }
 
 onMounted(() => {
-  if (userStore.hasPermission('admin:post:manage')) {
+  if (userStore.hasPermission('admin:post:read')) {
     loadPosts()
   }
 })

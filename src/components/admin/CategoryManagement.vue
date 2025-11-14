@@ -7,7 +7,13 @@
           <el-radio-button value="FORUM">论坛分类</el-radio-button>
         </el-radio-group>
       </div>
-      <el-button type="primary" @click="handleAddCategory">添加分类</el-button>
+      <el-button 
+        type="primary" 
+        @click="handleAddCategory"
+        v-if="userStore.hasPermission('admin:category:create')"
+      >
+        添加分类
+      </el-button>
     </div>
     <el-table :data="categoryList" v-loading="loading" style="width: 100%">
       <el-table-column prop="id" label="ID" width="80" align="center" />
@@ -36,8 +42,19 @@
       <el-table-column label="操作" width="200" align="center">
         <template #default="scope">
           <div style="display: flex; justify-content: center; gap: 8px;">
-            <el-button size="small" @click="handleEditCategory(scope.row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDeleteCategory(scope.row.id)">
+            <el-button 
+              size="small" 
+              @click="handleEditCategory(scope.row)"
+              v-if="userStore.hasPermission('admin:category:update')"
+            >
+              编辑
+            </el-button>
+            <el-button 
+              size="small" 
+              type="danger" 
+              @click="handleDeleteCategory(scope.row.id)"
+              v-if="userStore.hasPermission('admin:category:delete')"
+            >
               删除
             </el-button>
           </div>
@@ -97,7 +114,7 @@ const form = ref<Partial<CategoryConfig>>({
 })
 
 const loadCategories = async () => {
-  if (!userStore.hasPermission('admin:category:manage')) {
+  if (!userStore.hasPermission('admin:category:read')) {
     return
   }
   loading.value = true
@@ -117,6 +134,10 @@ const handleCategoryTypeChange = () => {
 }
 
 const handleAddCategory = () => {
+  if (!userStore.hasPermission('admin:category:create')) {
+    ElMessage.error('无权限执行此操作')
+    return
+  }
   dialogTitle.value = '添加分类'
   form.value = {
     name: '',
@@ -130,6 +151,10 @@ const handleAddCategory = () => {
 }
 
 const handleEditCategory = (category: CategoryConfig) => {
+  if (!userStore.hasPermission('admin:category:update')) {
+    ElMessage.error('无权限执行此操作')
+    return
+  }
   dialogTitle.value = '编辑分类'
   form.value = { ...category }
   dialogVisible.value = true
@@ -143,9 +168,17 @@ const handleSaveCategory = async () => {
   
   try {
     if (form.value.id) {
+      if (!userStore.hasPermission('admin:category:update')) {
+        ElMessage.error('无权限执行此操作')
+        return
+      }
       await categoryApi.updateConfig(form.value.id, form.value)
       ElMessage.success('更新成功')
     } else {
+      if (!userStore.hasPermission('admin:category:create')) {
+        ElMessage.error('无权限执行此操作')
+        return
+      }
       await categoryApi.createConfig(form.value as CategoryConfig)
       ElMessage.success('添加成功')
     }
@@ -157,6 +190,10 @@ const handleSaveCategory = async () => {
 }
 
 const handleDeleteCategory = async (id: number) => {
+  if (!userStore.hasPermission('admin:category:delete')) {
+    ElMessage.error('无权限执行此操作')
+    return
+  }
   try {
     await ElMessageBox.confirm('确定要删除这个分类吗？', '提示', {
       type: 'warning'
@@ -172,7 +209,7 @@ const handleDeleteCategory = async (id: number) => {
 }
 
 onMounted(() => {
-  if (userStore.hasPermission('admin:category:manage')) {
+  if (userStore.hasPermission('admin:category:read')) {
     loadCategories()
   }
 })

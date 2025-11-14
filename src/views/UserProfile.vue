@@ -134,6 +134,31 @@
           </el-tab-pane>
         </el-tabs>
       </el-tab-pane>
+      <el-tab-pane label="我的评论" name="comments" v-if="isOwnProfile">
+        <div class="comment-list" v-loading="commentLoading">
+          <el-card
+            v-for="comment in userComments"
+            :key="comment.id"
+            class="comment-card"
+            shadow="hover"
+            @click="goToComment(comment)"
+          >
+            <div class="comment-header">
+              <h4>评论</h4>
+              <span class="time">{{ formatTime(comment.createTime) }}</span>
+            </div>
+            <p class="comment-content">{{ comment.content }}</p>
+            <div class="comment-meta">
+              <el-tag size="small" type="info">帖子 #{{ comment.postId }}</el-tag>
+              <span>{{ comment.likeCount }} 点赞</span>
+              <span v-if="comment.replies && comment.replies.length > 0">
+                {{ comment.replies.length }} 回复
+              </span>
+            </div>
+          </el-card>
+          <el-empty v-if="!commentLoading && userComments.length === 0" description="暂无评论" />
+        </div>
+      </el-tab-pane>
       <el-tab-pane label="我的收藏" name="favorites" v-if="isOwnProfile">
         <el-tabs v-model="favoriteSubTab" @tab-change="handleFavoriteSubTabChange">
           <el-tab-pane label="全部" name="all">
@@ -298,6 +323,8 @@ const saveLoading = ref(false)
 const avatarUploading = ref(false)
 const avatarPreview = ref<string>('')
 const avatarFile = ref<File | null>(null)
+const commentLoading = ref(false)
+const userComments = ref<any[]>([])
 const editForm = ref({
   nickname: '',
   email: ''
@@ -493,8 +520,43 @@ const handleFavoriteSubTabChange = (tabName: string) => {
   }
 }
 
+const loadUserComments = async () => {
+  if (!isOwnProfile.value) return
+  commentLoading.value = true
+  try {
+    userComments.value = await forumApi.getUserComments(userId.value)
+  } catch (error) {
+    ElMessage.error('加载评论失败')
+  } finally {
+    commentLoading.value = false
+  }
+}
+
+const goToComment = async (comment: any) => {
+  if (comment.postId) {
+    // 先获取帖子标题（如果需要显示的话）
+    try {
+      const post = await forumApi.getPostById(comment.postId)
+      router.push({
+        path: `/forum/post/${comment.postId}`,
+        query: { commentId: comment.id }
+      })
+    } catch (error) {
+      // 如果帖子不存在，仍然尝试跳转
+      router.push({
+        path: `/forum/post/${comment.postId}`,
+        query: { commentId: comment.id }
+      })
+    }
+  }
+}
+
 const handleTabChange = (tabName: string) => {
-  if (tabName === 'likes') {
+  if (tabName === 'comments') {
+    if (userComments.value.length === 0) {
+      loadUserComments()
+    }
+  } else if (tabName === 'likes') {
     // 根据当前子tab加载数据
     handleLikedSubTabChange(likedSubTab.value)
   } else if (tabName === 'favorites') {
@@ -756,6 +818,59 @@ onMounted(() => {
 
 .content-card .meta .el-tag {
   margin-right: 4px;
+}
+
+.comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.comment-card {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.comment-card:hover {
+  transform: translateY(-2px);
+}
+
+.comment-card .comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.comment-card .comment-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.comment-card .comment-header .time {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.comment-card .comment-content {
+  margin: 0 0 12px 0;
+  color: var(--el-text-color-regular);
+  line-height: 1.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.comment-card .comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>
 

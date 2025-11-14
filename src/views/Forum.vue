@@ -56,24 +56,7 @@
         />
       </el-col>
       <el-col :span="6">
-        <el-card class="sidebar-card">
-          <template #header>
-            <div class="card-header">
-              <h3>发帖</h3>
-              <el-button
-                v-if="userStore.isLoggedIn && userStore.hasPermission('post:create')"
-                type="primary"
-                size="small"
-                @click="showPostDialog = true"
-              >
-                发布帖子
-              </el-button>
-            </div>
-          </template>
-          <p v-if="!userStore.isLoggedIn" class="login-tip">
-            请先<el-link type="primary" @click="$router.push('/login')">登录</el-link>后再发帖
-          </p>
-        </el-card>
+        <HotPosts @create-post="showPostDialog = true" />
       </el-col>
     </el-row>
     
@@ -122,6 +105,7 @@ import { useUserStore } from '@/stores/user'
 import { View, Star, ChatLineRound } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import HotPosts from '@/components/HotPosts.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -249,7 +233,7 @@ const handleSubmitPost = async () => {
   if (!postFormRef.value) return
   
   // 检查权限
-  if (!userStore.hasPermission('post:create')) {
+  if (!userStore.hasPermission('admin:post:create')) {
     ElMessage.error('您没有发布帖子的权限')
     return
   }
@@ -288,7 +272,10 @@ onMounted(() => {
 
 <style scoped>
 .forum-page {
-  padding: 20px 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .section-title {
@@ -363,24 +350,6 @@ onMounted(() => {
   gap: 4px;
 }
 
-.sidebar-card {
-  margin-bottom: 20px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.card-header h3 {
-  margin: 0;
-}
-
-.login-tip {
-  text-align: center;
-  color: var(--el-text-color-secondary);
-}
 </style>
 
 

@@ -51,7 +51,7 @@
             size="small"
             @change="handleResourceStatusChange(scope.row)"
             @click.stop
-            v-if="userStore.hasPermission('admin:resource:manage')"
+            v-if="userStore.hasPermission('admin:resource:update')"
             style="width: 120px"
           >
             <el-option label="待审核" value="PENDING" />
@@ -74,7 +74,7 @@
             <el-button
               size="small"
               @click.stop="handleEditResource(scope.row)"
-              v-if="userStore.hasPermission('admin:resource:manage')"
+              v-if="userStore.hasPermission('admin:resource:update')"
             >
               编辑
             </el-button>
@@ -82,7 +82,7 @@
               size="small"
               type="danger"
               @click.stop="handleDeleteResource(scope.row.id)"
-              v-if="userStore.hasPermission('admin:resource:manage')"
+              v-if="userStore.hasPermission('admin:resource:delete')"
             >
               删除
             </el-button>
@@ -138,7 +138,7 @@ const editDialogVisible = ref(false)
 const currentResource = ref<any>(null)
 
 const loadResources = async () => {
-  if (!userStore.hasPermission('admin:resource:manage')) {
+  if (!userStore.hasPermission('admin:resource:read')) {
     return
   }
   loading.value = true
@@ -213,7 +213,7 @@ const handleDeleteResource = async (id: number) => {
 }
 
 onMounted(() => {
-  if (userStore.hasPermission('admin:resource:manage')) {
+  if (userStore.hasPermission('admin:resource:read')) {
     loadResources()
   }
 })

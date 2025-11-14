@@ -82,8 +82,17 @@
         <el-card class="sidebar-card hot-posts-card">
           <template #header>
             <div class="hot-posts-header">
-              <el-icon class="hot-icon"><Star /></el-icon>
-              <h3>热门帖子</h3>
+              <div class="header-left">
+                <el-icon class="hot-icon"><Star /></el-icon>
+                <h3>热门帖子</h3>
+              </div>
+              <el-button
+                v-if="userStore.isLoggedIn && userStore.hasPermission('admin:post:create')"
+                type="primary"
+                @click="showPostDialog = true"
+              >
+                发布帖子
+              </el-button>
             </div>
           </template>
           <div class="post-list">
@@ -118,23 +127,61 @@
         </el-card>
       </el-col>
     </el-row>
+    
+    <!-- 发布帖子对话框 -->
+    <el-dialog
+      v-model="showPostDialog"
+      title="发布帖子"
+      width="600px"
+    >
+      <el-form :model="postForm" :rules="postRules" ref="postFormRef" label-width="80px">
+        <el-form-item label="标题" prop="title">
+          <el-input v-model="postForm.title" placeholder="请输入帖子标题" />
+        </el-form-item>
+        <el-form-item label="分类" prop="category">
+          <el-select v-model="postForm.category" placeholder="请选择分类">
+            <el-option 
+              v-for="config in forumCategoryConfigs.filter(c => c.code !== '')" 
+              :key="config.id"
+              :label="config.name" 
+              :value="config.code"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="内容" prop="content">
+          <el-input
+            v-model="postForm.content"
+            type="textarea"
+            :rows="8"
+            placeholder="请输入帖子内容"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showPostDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmitPost" :loading="postLoading">发布</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import {ref, onMounted, onActivated, watch} from 'vue'
+import {ref, computed, reactive, onMounted, onActivated, watch} from 'vue'
 import {useRouter, useRoute} from 'vue-router'
 import {resourceApi, type Resource} from '@/api/resource'
-import {forumApi, type ForumPost} from '@/api/forum'
 import {categoryApi, type CategoryConfig} from '@/api/category'
+import {forumApi, type PostForm} from '@/api/forum'
 import {User, Download, Star, Clock, View} from '@element-plus/icons-vue'
 import {ElMessage} from 'element-plus'
+import type {FormInstance, FormRules} from 'element-plus'
 import {isLoggedIn, toLogin} from "@/utils/auth.ts";
 import {useUserStore} from '@/stores/user'
+import {useHotPostsStore} from '@/stores/hotPosts'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const hotPostsStore = useHotPostsStore()
 
 // 页面级权限检查：如果没有page:home权限且不允许匿名访问，重定向到登录页
 onMounted(async () => {
@@ -147,8 +194,10 @@ onMounted(async () => {
   if (userStore.anonymousAccess) {
     // 加载分类配置和资源列表
     await loadCategoryConfigs()
+    await loadForumCategoryConfigs()
     await loadResources()
-    await loadHotPosts()
+    // 热门帖子使用全局 store，只在首次加载时获取
+    hotPostsStore.loadHotPosts()
     return
   }
   
@@ -161,18 +210,47 @@ onMounted(async () => {
   
   // 加载分类配置和资源列表
   await loadCategoryConfigs()
+  await loadForumCategoryConfigs()
   await loadResources()
-  await loadHotPosts()
+  // 热门帖子使用全局 store，只在首次加载时获取
+  hotPostsStore.loadHotPosts()
 })
 
 const loading = ref(false)
 const resourceList = ref<Resource[]>([])
-const hotPosts = ref<ForumPost[]>([])
 const categoryConfigs = ref<CategoryConfig[]>([])
+const forumCategoryConfigs = ref<CategoryConfig[]>([])
 const activeCategory = ref('')
 const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+
+// 使用全局 store 中的热门帖子数据
+const hotPosts = computed(() => hotPostsStore.hotPosts)
+
+// 发布帖子相关
+const showPostDialog = ref(false)
+const postFormRef = ref<FormInstance>()
+const postLoading = ref(false)
+const postForm = reactive<PostForm>({
+  title: '',
+  content: '',
+  category: ''
+})
+
+const postRules: FormRules = {
+  title: [
+    { required: true, message: '请输入帖子标题', trigger: 'blur' },
+    { min: 1, max: 100, message: '标题长度在 1 到 100 个字符', trigger: 'blur' }
+  ],
+  category: [
+    { required: true, message: '请选择分类', trigger: 'change' }
+  ],
+  content: [
+    { required: true, message: '请输入帖子内容', trigger: 'blur' },
+    { min: 1, max: 10000, message: '内容长度在 1 到 10000 个字符', trigger: 'blur' }
+  ]
+}
 
 const loadResources = async () => {
   loading.value = true
@@ -193,18 +271,11 @@ const loadResources = async () => {
   }
 }
 
-const loadHotPosts = async () => {
-  try {
-    const result = await forumApi.getPostList({page: 1, pageSize: 5})
-    hotPosts.value = result.list
-  } catch (error) {
-    // 静默失败
-  }
-}
 
 const loadCategoryConfigs = async () => {
   try {
     const configs = await categoryApi.getEnabledConfigs('RESOURCE')
+    categoryConfigs.value = configs
     
     // 如果允许匿名访问，显示所有分类，不进行权限过滤
     let filteredConfigs = configs
@@ -299,6 +370,48 @@ const goToPost = (id: number) => {
   router.push({name: 'ForumPost', params: {id}})
 }
 
+// 加载论坛分类配置
+const loadForumCategoryConfigs = async () => {
+  try {
+    const configs = await categoryApi.getEnabledConfigs('FORUM')
+    forumCategoryConfigs.value = configs
+  } catch (error) {
+    console.error('加载论坛分类配置失败', error)
+  }
+}
+
+// 发布帖子
+const handleSubmitPost = async () => {
+  if (!postFormRef.value) return
+  
+  // 检查权限
+  if (!userStore.hasPermission('admin:post:create')) {
+    ElMessage.error('您没有发布帖子的权限')
+    return
+  }
+  
+  await postFormRef.value.validate(async (valid) => {
+    if (valid && postFormRef.value) {
+      postLoading.value = true
+      try {
+        await forumApi.createPost(postForm)
+        ElMessage.success('发布成功')
+        showPostDialog.value = false
+        postFormRef.value.resetFields()
+        // 刷新热门帖子
+        hotPostsStore.clearCache()
+        hotPostsStore.loadHotPosts()
+        // 跳转到论坛页面
+        router.push({ name: 'Forum' })
+      } catch (error) {
+        ElMessage.error('发布失败')
+      } finally {
+        postLoading.value = false
+      }
+    }
+  })
+}
+
 const formatTime = (time: string) => {
   const date = new Date(time)
   const now = new Date()
@@ -318,29 +431,35 @@ watch(() => route.query.keyword, () => {
 watch(() => route.name, (newName) => {
   if (newName === 'Home') {
     loadResources()
-    loadHotPosts()
+    // 移除热门帖子的刷新，只在首次加载时获取
   }
 })
 
 // 组件激活时刷新数据（keep-alive 场景）
 onActivated(() => {
   loadCategoryConfigs().then(() => {
-  loadResources()
+    loadResources()
   })
-  loadHotPosts()
+  loadForumCategoryConfigs()
+  // 移除热门帖子的刷新，只在首次加载时获取
 })
 
 onMounted(() => {
   loadCategoryConfigs().then(() => {
-  loadResources()
+    loadResources()
   })
-  loadHotPosts()
+  loadForumCategoryConfigs()
+  // 热门帖子使用全局 store，只在首次加载时获取
+  hotPostsStore.loadHotPosts()
 })
 </script>
 
 <style scoped>
 .home {
-  padding: 20px 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .section-title {
@@ -412,6 +531,7 @@ onMounted(() => {
 
 .sidebar-card {
   margin-bottom: 20px;
+  margin-top: 100px;
 }
 
 .hot-posts-card {
@@ -430,6 +550,12 @@ onMounted(() => {
 }
 
 .hot-posts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
   display: flex;
   align-items: center;
   gap: 8px;
