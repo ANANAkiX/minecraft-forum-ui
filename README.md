@@ -3,7 +3,9 @@
 基于 Vue3 + Vite + TypeScript 的前端项目
 
 > **后端项目地址**：https://github.com/ANANAkiX/minecraft-forum.git
+> 
 > **后端 API 服务**：http://localhost:8080  
+> 
 > **后端 API 文档**：http://localhost:8080/doc.html
 
 ## 技术栈
@@ -46,7 +48,8 @@ npm run dev
 ```
 
 访问地址：http://localhost:5173
-
+### 登录账号 admin
+### 登录密码 123456
 ### 开发服务器配置
 
 开发服务器已配置代理，所有 `/api` 请求会自动代理到后端服务：
