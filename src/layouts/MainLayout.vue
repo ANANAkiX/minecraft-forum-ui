@@ -348,15 +348,21 @@ const performSearch = async () => {
   } catch (error: any) {
     console.error('搜索失败:', error)
     const errorMessage = error?.response?.data?.message || error?.message || '搜索失败，请稍后重试'
+    const statusCode = error?.response?.status || error?.response?.data?.code
     
-    if (error?.response?.status === 403) {
+    if (error?.response?.status === 403 || statusCode === 403) {
       // 权限错误已经在权限检查时提示了
       searchResults.value = []
       showSuggestions.value = false
-    } else if (error?.response?.status === 500) {
-      // 服务器错误，可能是 Elasticsearch 连接失败
-      console.error('Elasticsearch 可能未启动或连接失败:', errorMessage)
-      ElMessage.warning('搜索服务暂时不可用，请检查 Elasticsearch 服务')
+    } else if (error?.response?.status === 503 || statusCode === 503) {
+      // 503 Service Unavailable - Elasticsearch 服务暂时不可用
+      ElMessage.warning('搜索功能暂时不可用，Elasticsearch 正在连接中，请稍后重试')
+      searchResults.value = []
+      showSuggestions.value = false
+    } else if (error?.response?.status === 500 || statusCode === 500) {
+      // 服务器错误
+      console.error('搜索服务错误:', errorMessage)
+      ElMessage.error(errorMessage)
       searchResults.value = []
       showSuggestions.value = false
     } else {
