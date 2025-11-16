@@ -2,7 +2,7 @@
 
 基于 Vue3 + Vite + TypeScript 的前端项目
 
-> **后端项目地址**：`../minecraft-forum`  
+> **后端项目地址**：https://github.com/ANANAkiX/minecraft-forum.git
 > **后端 API 服务**：http://localhost:8080  
 > **后端 API 文档**：http://localhost:8080/doc.html
 

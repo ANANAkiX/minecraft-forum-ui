@@ -88,6 +88,23 @@ router.beforeEach(async (to, from, next) => {
         await userStore.fetchSystemConfig()
     }
 
+    // 如果用户已登录（有token）但用户信息还未加载，先加载用户信息
+    if (userStore.isLoggedIn && !userStore.userInfo) {
+        try {
+            await userStore.fetchUserInfo()
+        } catch (error) {
+            // 如果获取用户信息失败（如401），说明Token无效，清除token并跳转到登录页
+            console.warn('获取用户信息失败，Token可能已失效:', error)
+            userStore.logout()
+            if (to.name !== 'Login') {
+                next({name: 'Login', query: {redirect: to.fullPath}})
+            } else {
+                next()
+            }
+            return
+        }
+    }
+
     // 检查是否需要登录
     if (to.meta.requiresAuth && !userStore.isLoggedIn) {
         next({name: 'Login', query: {redirect: to.fullPath}})

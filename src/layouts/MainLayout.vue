@@ -235,18 +235,27 @@ const handleMenuSelect = (key: string) => {
 
 // 格式化建议项显示
 const formatSuggestion = (result: SearchResult): string => {
-  const typeText = result.type === 'POST' ? '帖子' : '资源'
-  const categoryText = result.category || ''
   const title = result.title || ''
+  
+  // 获取高亮内容，优先使用 highlights，如果没有则使用 summary
+  let highlightContent = ''
+  if (result.highlights && result.highlights.length > 0) {
+    // 取第一个高亮内容，如果太长则截取
+    highlightContent = result.highlights[0]
+    if (highlightContent.length > 100) {
+      highlightContent = highlightContent.substring(0, 100) + '...'
+    }
+  } else if (result.summary) {
+    highlightContent = result.summary
+    if (highlightContent.length > 100) {
+      highlightContent = highlightContent.substring(0, 100) + '...'
+    }
+  }
   
   return `<div class="suggestion-content">
     <div class="suggestion-title">${title}</div>
-    <div class="suggestion-meta">
-      <span class="suggestion-type">${typeText}</span>
-      ${categoryText ? `<span class="suggestion-category">${categoryText}</span>` : ''}
-      <span class="suggestion-author">${result.authorName}</span>
-    </div>
-    ${result.summary ? `<div class="suggestion-summary">${result.summary}</div>` : ''}
+    ${highlightContent ? `<div class="suggestion-highlight">${highlightContent}</div>` : ''}
+    <div class="suggestion-author">${result.authorName || '未知作者'}</div>
   </div>`
 }
 
@@ -293,6 +302,21 @@ const performSearch = async () => {
     showSuggestions.value = false
     searchLoading.value = false
     return
+  }
+  
+  // 如果用户已登录但用户信息还未加载，先加载用户信息
+  if (userStore.isLoggedIn && !userStore.userInfo) {
+    try {
+      await userStore.fetchUserInfo()
+    } catch (error) {
+      // 如果获取用户信息失败，说明Token无效，清除token
+      console.warn('获取用户信息失败，Token可能已失效:', error)
+      userStore.logout()
+      searchResults.value = []
+      showSuggestions.value = false
+      searchLoading.value = false
+      return
+    }
   }
   
   // 检查权限
@@ -395,6 +419,7 @@ const handleUserCommand = (command: string) => {
 
 
 const toggleDark = (val: boolean) => {
+  isDark.value = val
   if (val) {
     document.documentElement.classList.add('dark')
   } else {
@@ -535,6 +560,38 @@ onMounted(async () => {
   width: 100%;
 }
 
+/* 防止输入框在输入法输入时闪烁 */
+:deep(.search-input .el-input__wrapper),
+:deep(.search-input .el-input__wrapper:hover),
+:deep(.search-input .el-input__wrapper.is-focus),
+:deep(.search-input .el-input__wrapper.is-disabled) {
+  transition: none !important;
+  animation: none !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+:deep(.search-input .el-input__inner),
+:deep(.search-input .el-input__inner:hover),
+:deep(.search-input .el-input__inner:focus) {
+  transition: none !important;
+  animation: none !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+:deep(.search-input .el-input__prefix),
+:deep(.search-input .el-input__suffix) {
+  transition: none !important;
+  animation: none !important;
+  transform: none !important;
+}
+
+:deep(.search-input .el-input__clear) {
+  transition: none !important;
+  animation: none !important;
+}
+
 /* 自定义下拉建议列表 */
 .search-suggestions {
   position: absolute;
@@ -569,64 +626,75 @@ onMounted(async () => {
 /* 建议项内容样式 */
 .suggestion-content {
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .suggestion-title {
   font-size: 14px;
   font-weight: 500;
   color: var(--el-text-color-primary);
-  margin-bottom: 4px;
   line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  max-width: 100%;
 }
 
-.suggestion-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.suggestion-highlight {
   font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin-bottom: 4px;
+  color: var(--el-text-color-regular);
+  line-height: 1.4;
+  word-wrap: break-word;
+  word-break: break-all;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
-.suggestion-type {
-  padding: 2px 6px;
-  background-color: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
-  border-radius: 2px;
+/* 高亮关键词样式 - 通过 class 选择器统一设置样式（类似首页菜单激活颜色：绿色 #52c41a） */
+/* 使用 :deep() 确保样式能应用到 v-html 渲染的内容 */
+/* 只设置文字颜色，不设置背景色 */
+:deep(.suggestion-highlight .search-highlight),
+:deep(.suggestion-content .search-highlight),
+:deep(.suggestion-title .search-highlight) {
+  background-color: transparent;
+  color: #52c41a;
+  font-weight: normal;
 }
 
-.suggestion-category {
-  padding: 2px 6px;
-  background-color: var(--el-color-info-light-9);
-  color: var(--el-color-info);
-  border-radius: 2px;
+/* 夜间模式适配 - 高亮关键词 */
+html.dark :deep(.suggestion-highlight .search-highlight),
+html.dark :deep(.suggestion-content .search-highlight),
+html.dark :deep(.suggestion-title .search-highlight) {
+  background-color: transparent;
+  color: #95de64;
+}
+
+/* 夜间模式适配 - 搜索下拉框和搜索项 */
+html.dark .search-suggestions {
+  background: var(--el-bg-color);
+  border-color: var(--el-border-color-light);
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.3);
+}
+
+html.dark .suggestion-item {
+  border-bottom-color: var(--el-border-color-lighter);
+}
+
+html.dark .suggestion-item:hover,
+html.dark .suggestion-item.is-active {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 .suggestion-author {
-  color: var(--el-text-color-secondary);
-}
-
-.suggestion-summary {
   font-size: 12px;
   color: var(--el-text-color-secondary);
   line-height: 1.4;
-  margin-top: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
 }
 
-.suggestion-content em {
-  font-style: normal;
-  background-color: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
-  padding: 0 2px;
-  border-radius: 2px;
-  font-weight: 500;
-}
+/* 标题中的高亮关键词样式 - 由后端根据 isDark 参数动态设置内联样式，无需前端覆盖 */
 
 /* 搜索加载和空状态 */
 .search-loading,
