@@ -2,7 +2,7 @@
   <div class="forum-post">
     <el-row :gutter="20">
       <el-col :span="18" v-loading="loading">
-        <el-card v-if="post">
+    <el-card v-if="post">
       <template #header>
         <div class="post-header">
           <div>
@@ -51,18 +51,18 @@
           :infinite-scroll-distance="100"
           :infinite-scroll-immediate="false"
         >
-          <div class="comment-list">
-            <div
+        <div class="comment-list">
+          <div
               v-for="comment in comments"
-              :key="comment.id"
+            :key="comment.id"
               :id="`comment-${comment.id}`"
-              class="comment-item"
-            >
-              <el-avatar :src="comment.authorAvatar">{{ comment.authorName }}</el-avatar>
-              <div class="comment-content">
-                <div class="comment-header">
-                  <span class="author">{{ comment.authorName }}</span>
-                  <span class="time">{{ formatTime(comment.createTime) }}</span>
+            class="comment-item"
+          >
+            <el-avatar :src="comment.authorAvatar">{{ comment.authorName }}</el-avatar>
+            <div class="comment-content">
+              <div class="comment-header">
+                <span class="author">{{ comment.authorName }}</span>
+                <span class="time">{{ formatTime(comment.createTime) }}</span>
                 <el-button
                   v-if="userStore.userInfo?.id === comment.authorId"
                   link
@@ -151,9 +151,9 @@
                   @cancel-reply="cancelReply"
                   @update-reply-content="(content: string) => replyContent = content"
                 />
+                  </div>
+                </div>
               </div>
-              </div>
-            </div>
             
             <div v-if="commentLoading" class="loading-more">
               <el-icon class="is-loading"><Loading /></el-icon>

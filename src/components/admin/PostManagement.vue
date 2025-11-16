@@ -126,6 +126,9 @@ const sortBy = ref('createTime')
 const editDialogVisible = ref(false)
 const currentPost = ref<any>(null)
 
+// 是否已加载过数据（防止重复加载）
+const hasLoaded = ref(false)
+
 const loadPosts = async () => {
   if (!userStore.hasPermission('admin:post:read')) {
     return
@@ -155,6 +158,7 @@ const loadPosts = async () => {
     ElMessage.error('加载帖子列表失败')
   } finally {
     loading.value = false
+    hasLoaded.value = true
   }
 }
 
@@ -192,7 +196,8 @@ const handleDeletePost = async (id: number) => {
 }
 
 onMounted(() => {
-  if (userStore.hasPermission('admin:post:read')) {
+  // 懒加载：只在组件挂载且未加载过时加载数据
+  if (userStore.hasPermission('admin:post:read') && !hasLoaded.value) {
     loadPosts()
   }
 })

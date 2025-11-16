@@ -137,6 +137,9 @@ const sortBy = ref('createTime')
 const editDialogVisible = ref(false)
 const currentResource = ref<any>(null)
 
+// 是否已加载过数据（防止重复加载）
+const hasLoaded = ref(false)
+
 const loadResources = async () => {
   if (!userStore.hasPermission('admin:resource:read')) {
     return
@@ -163,6 +166,7 @@ const loadResources = async () => {
     ElMessage.error('加载资源列表失败')
   } finally {
     loading.value = false
+    hasLoaded.value = true
   }
 }
 
@@ -213,15 +217,14 @@ const handleDeleteResource = async (id: number) => {
 }
 
 onMounted(() => {
-  if (userStore.hasPermission('admin:resource:read')) {
+  // 懒加载：只在组件挂载且未加载过时加载数据
+  if (userStore.hasPermission('admin:resource:read') && !hasLoaded.value) {
     loadResources()
   }
 })
 </script>
 
 <script lang="ts">
-import { ElMessageBox } from 'element-plus'
-import { resourceApi } from '@/api/resource'
 export default {
   name: 'ResourceManagement'
 }

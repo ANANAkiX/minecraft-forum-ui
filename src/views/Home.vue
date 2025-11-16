@@ -225,6 +225,11 @@ const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
+// 防止重复加载的标志
+const hasLoadedResources = ref(false)
+const hasLoadedCategoryConfigs = ref(false)
+const hasLoadedForumCategoryConfigs = ref(false)
+
 // 使用全局 store 中的热门帖子数据
 const hotPosts = computed(() => hotPostsStore.hotPosts)
 
@@ -253,6 +258,11 @@ const postRules: FormRules = {
 }
 
 const loadResources = async () => {
+  // 如果正在加载，直接返回
+  if (loading.value) {
+    return
+  }
+  
   loading.value = true
   try {
     const keyword = route.query.keyword as string
@@ -264,6 +274,7 @@ const loadResources = async () => {
     })
     resourceList.value = result.list
     total.value = result.total
+    hasLoadedResources.value = true
   } catch (error) {
     ElMessage.error('加载资源失败')
   } finally {
@@ -273,6 +284,11 @@ const loadResources = async () => {
 
 
 const loadCategoryConfigs = async () => {
+  // 如果已经加载过，直接返回
+  if (hasLoadedCategoryConfigs.value && categoryConfigs.value.length > 0) {
+    return
+  }
+  
   try {
     const configs = await categoryApi.getEnabledConfigs('RESOURCE')
     categoryConfigs.value = configs
@@ -311,6 +327,7 @@ const loadCategoryConfigs = async () => {
       // 如果所有分类都没有权限，设置为空（显示全部，但可能没有权限）
       activeCategory.value = ''
     }
+    hasLoadedCategoryConfigs.value = true
   } catch (error) {
     ElMessage.error('加载分类配置失败')
     // 如果加载失败，根据权限使用默认配置
@@ -353,6 +370,8 @@ const loadCategoryConfigs = async () => {
 
 const handleCategoryChange = () => {
   page.value = 1
+  // 分类改变时，重置加载标志，强制重新加载
+  hasLoadedResources.value = false
   loadResources()
 }
 
@@ -372,9 +391,15 @@ const goToPost = (id: number) => {
 
 // 加载论坛分类配置
 const loadForumCategoryConfigs = async () => {
+  // 如果已经加载过，直接返回
+  if (hasLoadedForumCategoryConfigs.value && forumCategoryConfigs.value.length > 0) {
+    return
+  }
+  
   try {
     const configs = await categoryApi.getEnabledConfigs('FORUM')
     forumCategoryConfigs.value = configs
+    hasLoadedForumCategoryConfigs.value = true
   } catch (error) {
     console.error('加载论坛分类配置失败', error)
   }
@@ -424,33 +449,34 @@ const formatTime = (time: string) => {
 }
 
 watch(() => route.query.keyword, () => {
+  // 关键词改变时，重置加载标志，强制重新加载
+  hasLoadedResources.value = false
+  page.value = 1
   loadResources()
 })
 
 // 监听路由名称变化，当返回首页时刷新数据
 watch(() => route.name, (newName) => {
   if (newName === 'Home') {
-    loadResources()
-    // 移除热门帖子的刷新，只在首次加载时获取
+    // 只有在数据未加载时才加载，避免重复调用
+    if (!hasLoadedResources.value) {
+      loadResources()
+    }
   }
 })
 
 // 组件激活时刷新数据（keep-alive 场景）
 onActivated(() => {
-  loadCategoryConfigs().then(() => {
+  // 只有在数据未加载时才加载，避免重复调用
+  if (!hasLoadedCategoryConfigs.value) {
+    loadCategoryConfigs()
+  }
+  if (!hasLoadedForumCategoryConfigs.value) {
+    loadForumCategoryConfigs()
+  }
+  if (!hasLoadedResources.value) {
     loadResources()
-  })
-  loadForumCategoryConfigs()
-  // 移除热门帖子的刷新，只在首次加载时获取
-})
-
-onMounted(() => {
-  loadCategoryConfigs().then(() => {
-    loadResources()
-  })
-  loadForumCategoryConfigs()
-  // 热门帖子使用全局 store，只在首次加载时获取
-  hotPostsStore.loadHotPosts()
+  }
 })
 </script>
 

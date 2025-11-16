@@ -40,16 +40,53 @@
           </el-menu-item>
         </el-menu>
         <div class="header-actions">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索资源..."
-            class="search-input"
-            @keyup.enter="handleSearch"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
+          <div class="search-wrapper">
+            <div class="search-input-container">
+              <el-input
+                v-model="searchKeyword"
+                placeholder="搜索帖子和资源..."
+                class="search-input"
+                @input="handleSearchInput"
+                @keyup.enter="handleSearch"
+                @focus="handleSearchFocus"
+                @blur="handleSearchBlur"
+                clearable
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+                    <!-- 自定义下拉建议列表 -->
+                    <div
+                      v-if="showSuggestions && searchKeyword.trim().length >= 2"
+                      class="search-suggestions"
+                      @mousedown.prevent
+                    >
+                      <!-- 加载中状态 -->
+                      <div v-if="searchLoading" class="search-loading">
+                        <el-icon class="is-loading"><Loading /></el-icon>
+                        <span style="margin-left: 8px;">搜索中...</span>
+                      </div>
+                      <!-- 有搜索结果 -->
+                      <template v-else-if="searchResults.length > 0">
+                        <div
+                          v-for="(result, index) in searchResults"
+                          :key="`${result.type}-${result.id}`"
+                          class="suggestion-item"
+                          :class="{ 'is-active': selectedIndex === index }"
+                          @click="handleSelectResult(result)"
+                          @mouseenter="selectedIndex = index"
+                          v-html="formatSuggestion(result)"
+                        ></div>
+                      </template>
+                      <!-- 无搜索结果 -->
+                      <div v-else class="search-empty">
+                        <el-icon><DocumentRemove /></el-icon>
+                        <span style="margin-left: 8px;">暂无数据</span>
+                      </div>
+                    </div>
+            </div>
+          </div>
           <el-switch
             v-model="isDark"
             inline-prompt
@@ -99,8 +136,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { usePageTitle } from '@/composables/usePageTitle'
-import { Grid, Search, Moon, Sunny, User, Close } from '@element-plus/icons-vue'
+import { Grid, Search, Moon, Sunny, User, Close, Loading, DocumentRemove } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { searchApi, type SearchResult } from '@/api/search'
 
 const router = useRouter()
 const route = useRoute()
@@ -109,6 +147,11 @@ const pageTitle = usePageTitle()
 
 const searchKeyword = ref('')
 const isDark = ref(document.documentElement.classList.contains('dark'))
+const searchLoading = ref(false)
+const searchResults = ref<SearchResult[]>([])
+const showSuggestions = ref(false)
+const selectedIndex = ref(-1)
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 // 获取所有标题列表的计算属性
 const titleList = computed(() => {
@@ -190,9 +233,154 @@ const handleMenuSelect = (key: string) => {
   router.push({ name: key.charAt(0).toUpperCase() + key.slice(1) })
 }
 
+// 格式化建议项显示
+const formatSuggestion = (result: SearchResult): string => {
+  const typeText = result.type === 'POST' ? '帖子' : '资源'
+  const categoryText = result.category || ''
+  const title = result.title || ''
+  
+  return `<div class="suggestion-content">
+    <div class="suggestion-title">${title}</div>
+    <div class="suggestion-meta">
+      <span class="suggestion-type">${typeText}</span>
+      ${categoryText ? `<span class="suggestion-category">${categoryText}</span>` : ''}
+      <span class="suggestion-author">${result.authorName}</span>
+    </div>
+    ${result.summary ? `<div class="suggestion-summary">${result.summary}</div>` : ''}
+  </div>`
+}
+
+// 输入处理（防抖）
+const handleSearchInput = () => {
+  // 清除之前的定时器
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+  }
+  
+  const keyword = searchKeyword.value?.trim() || ''
+  
+  // 如果关键词太短，清空结果并隐藏搜索框
+  if (keyword.length < 2) {
+    searchResults.value = []
+    showSuggestions.value = false
+    searchLoading.value = false
+    return
+  }
+  
+  // 立即显示搜索框（即使还在加载）
+  showSuggestions.value = true
+  
+  // 延迟搜索，避免频繁请求
+  searchTimer = setTimeout(async () => {
+    await performSearch()
+  }, 300)
+}
+
+// 搜索框获得焦点
+const handleSearchFocus = () => {
+  // 如果有搜索关键词且长度>=2，显示搜索框
+  if (searchKeyword.value && searchKeyword.value.trim().length >= 2) {
+    showSuggestions.value = true
+  }
+}
+
+// 执行搜索
+const performSearch = async () => {
+  const keyword = searchKeyword.value?.trim() || ''
+  
+  if (keyword.length < 2) {
+    searchResults.value = []
+    showSuggestions.value = false
+    searchLoading.value = false
+    return
+  }
+  
+  // 检查权限
+  if (!userStore.hasPermission('elasticsearch:search')) {
+    ElMessage.warning('您没有搜索权限')
+    searchResults.value = []
+    showSuggestions.value = false
+    searchLoading.value = false
+    return
+  }
+  
+  // 显示加载状态
+  searchLoading.value = true
+  showSuggestions.value = true
+  
+  try {
+    const results = await searchApi.search({
+      keyword: keyword,
+      page: 1,
+      pageSize: 10
+    })
+    
+    // 设置搜索结果
+    searchResults.value = results || []
+    selectedIndex.value = -1
+    
+    // 确保搜索框显示（包括空结果）
+    showSuggestions.value = true
+  } catch (error: any) {
+    console.error('搜索失败:', error)
+    const errorMessage = error?.response?.data?.message || error?.message || '搜索失败，请稍后重试'
+    
+    if (error?.response?.status === 403) {
+      // 权限错误已经在权限检查时提示了
+      searchResults.value = []
+      showSuggestions.value = false
+    } else if (error?.response?.status === 500) {
+      // 服务器错误，可能是 Elasticsearch 连接失败
+      console.error('Elasticsearch 可能未启动或连接失败:', errorMessage)
+      ElMessage.warning('搜索服务暂时不可用，请检查 Elasticsearch 服务')
+      searchResults.value = []
+      showSuggestions.value = false
+    } else {
+      ElMessage.error(errorMessage)
+      searchResults.value = []
+      showSuggestions.value = false
+    }
+  } finally {
+    // 搜索完成，关闭加载状态
+    searchLoading.value = false
+  }
+}
+
+// 选择搜索结果
+const handleSelectResult = (result: SearchResult) => {
+  if (result.type === 'POST') {
+    router.push({ name: 'ForumPost', params: { id: result.id } })
+  } else if (result.type === 'RESOURCE') {
+    router.push({ name: 'ResourceDetail', params: { id: result.id } })
+  }
+  searchKeyword.value = ''
+  searchResults.value = []
+  showSuggestions.value = false
+  selectedIndex.value = -1
+}
+
+// 搜索框失去焦点处理
+const handleSearchBlur = () => {
+  // 延迟隐藏，允许点击建议项
+  setTimeout(() => {
+    showSuggestions.value = false
+  }, 200)
+}
+
+// 回车搜索
 const handleSearch = () => {
   if (searchKeyword.value.trim()) {
-    router.push({ name: 'Home', query: { keyword: searchKeyword.value } })
+    // 如果有搜索结果，跳转到第一个结果或选中的结果
+    if (searchResults.value.length > 0) {
+      const result = selectedIndex.value >= 0 
+        ? searchResults.value[selectedIndex.value]
+        : searchResults.value[0]
+      handleSelectResult(result)
+    } else {
+      // 如果没有搜索结果，使用原来的搜索方式
+      router.push({ name: 'Home', query: { keyword: searchKeyword.value } })
+      searchKeyword.value = ''
+    }
   }
 }
 
@@ -334,8 +522,130 @@ onMounted(async () => {
   margin-left: auto;
 }
 
+.search-wrapper {
+  position: relative;
+}
+
+.search-input-container {
+  position: relative;
+  width: 225px;
+}
+
 .search-input {
-  width: 300px;
+  width: 100%;
+}
+
+/* 自定义下拉建议列表 */
+.search-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 4px;
+  box-shadow: var(--el-box-shadow-light);
+  z-index: 2000;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.suggestion-item {
+  padding: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover,
+.suggestion-item.is-active {
+  background-color: var(--el-fill-color-light);
+}
+
+/* 建议项内容样式 */
+.suggestion-content {
+  padding: 0;
+}
+
+.suggestion-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.suggestion-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 4px;
+}
+
+.suggestion-type {
+  padding: 2px 6px;
+  background-color: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  border-radius: 2px;
+}
+
+.suggestion-category {
+  padding: 2px 6px;
+  background-color: var(--el-color-info-light-9);
+  color: var(--el-color-info);
+  border-radius: 2px;
+}
+
+.suggestion-author {
+  color: var(--el-text-color-secondary);
+}
+
+.suggestion-summary {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.4;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.suggestion-content em {
+  font-style: normal;
+  background-color: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+/* 搜索加载和空状态 */
+.search-loading,
+.search-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--el-text-color-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.search-empty {
+  color: var(--el-text-color-placeholder);
+}
+
+.search-empty .el-icon {
+  font-size: 18px;
 }
 
 .user-avatar {

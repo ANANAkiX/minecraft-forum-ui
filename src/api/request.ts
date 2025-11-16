@@ -50,7 +50,8 @@ class Request {
           } else if (code === 401) {
             const userStore = useUserStore()
             // 只有在当前路由不是登录页时才显示消息和跳转
-            if (router.currentRoute.value.name !== 'Login') {
+            // 并且只有在确实有Token的情况下才跳转（避免在登录/注册接口返回401时跳转）
+            if (router.currentRoute.value.name !== 'Login' && userStore.token) {
               userStore.logout()
               router.push('/login')
               // 不显示消息，避免与路由守卫的消息重复

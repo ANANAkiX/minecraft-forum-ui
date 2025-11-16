@@ -18,7 +18,6 @@ export interface UserInfo {
   nickname: string
   email: string
   avatar: string
-  role: string
   status?: number
   createTime: string
   updateTime?: string

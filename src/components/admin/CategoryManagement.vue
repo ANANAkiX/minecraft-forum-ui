@@ -113,6 +113,9 @@ const form = ref<Partial<CategoryConfig>>({
   status: 1
 })
 
+// 是否已加载过数据（防止重复加载）
+const hasLoaded = ref(false)
+
 const loadCategories = async () => {
   if (!userStore.hasPermission('admin:category:read')) {
     return
@@ -125,6 +128,7 @@ const loadCategories = async () => {
     ElMessage.error('加载分类配置失败')
   } finally {
     loading.value = false
+    hasLoaded.value = true
   }
 }
 
@@ -209,7 +213,8 @@ const handleDeleteCategory = async (id: number) => {
 }
 
 onMounted(() => {
-  if (userStore.hasPermission('admin:category:read')) {
+  // 懒加载：只在组件挂载且未加载过时加载数据
+  if (userStore.hasPermission('admin:category:read') && !hasLoaded.value) {
     loadCategories()
   }
 })

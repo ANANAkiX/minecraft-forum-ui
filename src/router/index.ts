@@ -104,13 +104,20 @@ router.beforeEach(async (to, from, next) => {
             return
         }
         
-        // 如果用户已登录，确保权限已从JWT中提取
-        if (userStore.isLoggedIn && userStore.permissions.length === 0) {
-            // 权限还未提取，立即提取（这不应该发生，但作为安全措施）
+        // 如果用户已登录但权限还未加载，先等待权限加载完成
+        if (userStore.isLoggedIn && userStore.permissions.length === 0 && !userStore.userInfo) {
+            // 权限还未获取，立即获取（这不应该发生，但作为安全措施）
             const token = localStorage.getItem('token')
             if (token) {
-                // 重新提取权限
-                userStore.extractInfoFromToken()
+                try {
+                    // 等待获取用户信息（包含权限）
+                    await userStore.fetchUserInfo()
+                } catch (error) {
+                    // 如果获取用户信息失败（如401），说明Token无效，跳转到登录页
+                    console.warn('获取用户信息失败，Token可能已失效:', error)
+                    next({name: 'Login', query: {redirect: to.fullPath}})
+                    return
+                }
             }
         }
         

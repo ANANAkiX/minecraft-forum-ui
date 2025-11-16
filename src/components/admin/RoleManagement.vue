@@ -24,7 +24,7 @@
       </el-table-column>
       <el-table-column prop="createTime" label="创建时间" align="center">
         <template #default="scope">
-          {{ formatDateTime(scope.row.createTime) }}
+          {{ scope.row.createTime ? formatDateTime(scope.row.createTime) : '-' }}
         </template>
       </el-table-column>
       <el-table-column label="操作" width="300" align="center">
@@ -113,6 +113,9 @@ const form = ref<Partial<Role>>({
 const permissionDialogVisible = ref(false)
 const currentRoleForPermission = ref<Role | null>(null)
 
+// 是否已加载过数据（防止重复加载）
+const hasLoaded = ref(false)
+
 const loadRoles = async () => {
   if (!userStore.hasPermission('admin:role:read')) {
     return
@@ -125,6 +128,7 @@ const loadRoles = async () => {
     ElMessage.error('加载角色列表失败')
   } finally {
     loading.value = false
+    hasLoaded.value = true
   }
 }
 
@@ -212,7 +216,8 @@ const handleManageRolePermissions = (role: Role) => {
 }
 
 onMounted(() => {
-  if (userStore.hasPermission('admin:role:read')) {
+  // 懒加载：只在组件挂载且未加载过时加载数据
+  if (userStore.hasPermission('admin:role:read') && !hasLoaded.value) {
     loadRoles()
   }
 })

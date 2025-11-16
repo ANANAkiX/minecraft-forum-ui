@@ -81,6 +81,9 @@ const canAccess = computed(() => {
   return userStore.hasPermission('admin:file:read') || userStore.hasPermission('admin:file:manage')
 })
 
+// 是否已加载过数据（防止重复加载）
+const hasLoaded = ref(false)
+
 const loadFiles = async () => {
   if (!canAccess.value) {
     return
@@ -98,6 +101,7 @@ const loadFiles = async () => {
     ElMessage.error('加载文件列表失败')
   } finally {
     loading.value = false
+    hasLoaded.value = true
   }
 }
 
@@ -132,7 +136,8 @@ const handleDeleteFile = async (id: number) => {
 }
 
 onMounted(() => {
-  if (canAccess.value) {
+  // 懒加载：只在组件挂载且未加载过时加载数据
+  if (canAccess.value && !hasLoaded.value) {
     loadFiles()
   }
 })

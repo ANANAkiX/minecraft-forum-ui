@@ -1,56 +1,129 @@
 <template>
   <div class="admin-page" v-if="userStore.hasPermission('page:admin')">
-    <el-tabs v-model="activeTab">
+    <el-tabs v-model="activeTab" lazy>
       <!-- 用户管理：需要 admin:user:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="用户管理" name="users" v-if="canAccessUserManagement">
-        <UserManagement />
+        <Suspense v-if="activeTab === 'users'">
+          <template #default>
+            <UserManagement />
+          </template>
+          <template #fallback>
+            <div style="padding: 20px; text-align: center;">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span style="margin-left: 8px;">加载中...</span>
+            </div>
+          </template>
+        </Suspense>
       </el-tab-pane>
       
       <!-- 资源管理：需要 admin:resource:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="资源管理" name="resources" v-if="canAccessResourceManagement">
-        <ResourceManagement />
+        <Suspense v-if="activeTab === 'resources'">
+          <template #default>
+            <ResourceManagement />
+          </template>
+          <template #fallback>
+            <div style="padding: 20px; text-align: center;">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span style="margin-left: 8px;">加载中...</span>
+            </div>
+          </template>
+        </Suspense>
       </el-tab-pane>
       
       <!-- 帖子管理：需要 admin:post:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="帖子管理" name="posts" v-if="canAccessPostManagement">
-        <PostManagement />
+        <Suspense v-if="activeTab === 'posts'">
+          <template #default>
+            <PostManagement />
+          </template>
+          <template #fallback>
+            <div style="padding: 20px; text-align: center;">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span style="margin-left: 8px;">加载中...</span>
+            </div>
+          </template>
+        </Suspense>
       </el-tab-pane>
       
       <!-- 角色管理：需要 admin:role:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="角色管理" name="roles" v-if="canAccessRoleManagement">
-        <RoleManagement />
+        <Suspense v-if="activeTab === 'roles'">
+          <template #default>
+            <RoleManagement />
+          </template>
+          <template #fallback>
+            <div style="padding: 20px; text-align: center;">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span style="margin-left: 8px;">加载中...</span>
+            </div>
+          </template>
+        </Suspense>
       </el-tab-pane>
       
       <!-- 分类配置：需要 admin:category:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="分类配置" name="categories" v-if="canAccessCategoryManagement">
-        <CategoryManagement />
+        <Suspense v-if="activeTab === 'categories'">
+          <template #default>
+            <CategoryManagement />
+          </template>
+          <template #fallback>
+            <div style="padding: 20px; text-align: center;">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span style="margin-left: 8px;">加载中...</span>
+            </div>
+          </template>
+        </Suspense>
       </el-tab-pane>
       
       <!-- 文件管理：需要 admin:file:read 或 admin:file:manage 权限 -->
       <el-tab-pane label="文件管理" name="files" v-if="canAccessFileManagement">
-        <FileManagement />
+        <Suspense v-if="activeTab === 'files'">
+          <template #default>
+            <FileManagement />
+          </template>
+          <template #fallback>
+            <div style="padding: 20px; text-align: center;">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span style="margin-left: 8px;">加载中...</span>
+            </div>
+          </template>
+        </Suspense>
       </el-tab-pane>
       
       <!-- 权限管理：需要 admin:permission:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="权限管理" name="permissions" v-if="canAccessPermissionManagement">
-        <PermissionManagement />
+        <Suspense v-if="activeTab === 'permissions'">
+          <template #default>
+            <PermissionManagement />
+          </template>
+          <template #fallback>
+            <div style="padding: 20px; text-align: center;">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span style="margin-left: 8px;">加载中...</span>
+            </div>
+          </template>
+        </Suspense>
       </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import UserManagement from '@/components/admin/UserManagement.vue'
-import FileManagement from '@/components/admin/FileManagement.vue'
-import PermissionManagement from '@/components/admin/PermissionManagement.vue'
-import CategoryManagement from '@/components/admin/CategoryManagement.vue'
-import RoleManagement from '@/components/admin/RoleManagement.vue'
-import ResourceManagement from '@/components/admin/ResourceManagement.vue'
-import PostManagement from '@/components/admin/PostManagement.vue'
+import { Loading } from '@element-plus/icons-vue'
+
+// 使用 defineAsyncComponent 实现懒加载
+const UserManagement = defineAsyncComponent(() => import('@/components/admin/UserManagement.vue'))
+const FileManagement = defineAsyncComponent(() => import('@/components/admin/FileManagement.vue'))
+const PermissionManagement = defineAsyncComponent(() => import('@/components/admin/PermissionManagement.vue'))
+const CategoryManagement = defineAsyncComponent(() => import('@/components/admin/CategoryManagement.vue'))
+const RoleManagement = defineAsyncComponent(() => import('@/components/admin/RoleManagement.vue'))
+const ResourceManagement = defineAsyncComponent(() => import('@/components/admin/ResourceManagement.vue'))
+const PostManagement = defineAsyncComponent(() => import('@/components/admin/PostManagement.vue'))
 
 const router = useRouter()
 const userStore = useUserStore()

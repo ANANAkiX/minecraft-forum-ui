@@ -32,7 +32,7 @@
                 :loading="downloadingAll"
               >
                 下载所有文件 {{ files.length > 0 ? `(${files.length})` : '' }}
-              </el-button>
+            </el-button>
             </el-tooltip>
           </div>
         </div>
@@ -308,7 +308,7 @@ const handleDownloadAll = async () => {
         // 添加小延迟，避免浏览器阻止多个下载
         if (i < files.value.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 300))
-        }
+    }
       } catch (error: any) {
         console.error(`下载文件 ${file.originalName} 失败:`, error)
         ElMessage.warning(`文件 ${file.originalName} 下载失败`)

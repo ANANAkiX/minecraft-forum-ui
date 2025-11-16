@@ -238,6 +238,9 @@ const canAccess = computed(() => {
   return userStore.hasPermission('admin:permission:read')
 })
 
+// 是否已加载过数据（防止重复加载）
+const hasLoaded = ref(false)
+
 const loadPermissions = async () => {
   if (!canAccess.value) {
     return
@@ -256,6 +259,7 @@ const loadPermissions = async () => {
     ElMessage.error('加载权限列表失败')
   } finally {
     loading.value = false
+    hasLoaded.value = true
   }
 }
 
@@ -437,7 +441,8 @@ const handleDeletePermission = async (id: number) => {
 }
 
 onMounted(() => {
-  if (canAccess.value) {
+  // 懒加载：只在组件挂载且未加载过时加载数据
+  if (canAccess.value && !hasLoaded.value) {
     loadPermissions()
   }
 })

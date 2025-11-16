@@ -7,7 +7,6 @@ export interface User {
   nickname: string
   email: string
   avatar: string
-  role: string
   status: number
   createTime: string
   updateTime: string
@@ -19,6 +18,8 @@ export interface Role {
   code: string
   description: string
   status: number
+  createTime?: string
+  updateTime?: string
 }
 
 export interface RolePermission {
@@ -96,8 +97,8 @@ export interface UserListResponse {
 export const adminApi = {
   getUserList: (params: UserListParams) => 
     request.get<UserListResponse>('/admin/users', { params }),
-  updateUserRole: (userId: number, role: string) => 
-    request.put<User>(`/admin/users/${userId}/role`, { role }),
+  createUser: (user: Partial<User> & { password?: string }) => 
+    request.post<User>('/admin/users', user),
   updateUserStatus: (userId: number, status: number) => 
     request.put<User>(`/admin/users/${userId}/status`, { status }),
   getUserRoles: (userId: number) => 

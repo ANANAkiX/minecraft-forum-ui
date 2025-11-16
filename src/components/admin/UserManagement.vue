@@ -97,6 +97,14 @@
         <el-form-item label="用户名" required>
           <el-input v-model="userForm.username" placeholder="请输入用户名" :disabled="!!userForm.id" />
         </el-form-item>
+        <el-form-item v-if="!userForm.id" label="密码">
+          <el-input 
+            v-model="userForm.password" 
+            type="password" 
+            placeholder="留空则自动生成随机密码" 
+            show-password 
+          />
+        </el-form-item>
         <el-form-item label="昵称" required>
           <el-input v-model="userForm.nickname" placeholder="请输入昵称" />
         </el-form-item>
@@ -137,13 +145,16 @@ const currentUserForRole = ref<User | null>(null)
 
 const userEditDialogVisible = ref(false)
 const userEditDialogTitle = ref('添加用户')
-const userForm = ref<Partial<User>>({
+const userForm = ref<Partial<User> & { password?: string }>({
   username: '',
   nickname: '',
   email: '',
-  role: 'USER',
+  password: '',
   status: 0
 })
+
+// 是否已加载过数据（防止重复加载）
+const hasLoaded = ref(false)
 
 const loadUsers = async () => {
   if (!userStore.hasPermission('admin:user:read')) {
@@ -162,6 +173,7 @@ const loadUsers = async () => {
     ElMessage.error('加载用户列表失败')
   } finally {
     loading.value = false
+    hasLoaded.value = true
   }
 }
 
@@ -195,6 +207,7 @@ const handleAddUser = () => {
     username: '',
     nickname: '',
     email: '',
+    password: '',
     status: 0
   }
   userEditDialogVisible.value = true
@@ -235,7 +248,18 @@ const handleSaveUser = async () => {
       })
       ElMessage.success('用户更新成功')
     } else {
-      ElMessage.warning('创建用户功能需要后端API支持')
+      if (!userStore.hasPermission('admin:user:create')) {
+        ElMessage.error('无权限执行此操作')
+        return
+      }
+      await adminApi.createUser({
+        username: userForm.value.username,
+        password: userForm.value.password || undefined, // 可选，如果不提供则后端生成随机密码
+        nickname: userForm.value.nickname,
+        email: userForm.value.email,
+        status: userForm.value.status
+      })
+      ElMessage.success('用户创建成功')
     }
     userEditDialogVisible.value = false
     loadUsers()
