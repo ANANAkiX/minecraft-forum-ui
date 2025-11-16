@@ -76,7 +76,7 @@
         </Suspense>
       </el-tab-pane>
       
-      <!-- 文件管理：需要 admin:file:read 或 admin:file:manage 权限 -->
+      <!-- 文件管理：需要 admin:file:manage 权限（仅控制标签显示） -->
       <el-tab-pane label="文件管理" name="files" v-if="canAccessFileManagement">
         <Suspense v-if="activeTab === 'files'">
           <template #default>
@@ -161,7 +161,7 @@ const canAccessCategoryManagement = computed(() => {
 })
 
 const canAccessFileManagement = computed(() => {
-  return userStore.hasPermission('admin:file:read') || userStore.hasPermission('admin:file:manage')
+  return userStore.hasPermission('admin:file:manage')
 })
 
 const canAccessPermissionManagement = computed(() => {
@@ -184,6 +184,12 @@ const getDefaultTab = () => {
   }
   if (canAccessCategoryManagement.value) {
     return 'categories'
+  }
+  if (canAccessFileManagement.value) {
+    return 'files'
+  }
+  if (canAccessPermissionManagement.value) {
+    return 'permissions'
   }
   return 'users'
 }

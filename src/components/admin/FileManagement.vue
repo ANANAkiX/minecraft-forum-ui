@@ -34,13 +34,21 @@
           {{ formatDateTime(scope.row.createTime) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="150" align="center">
+      <el-table-column label="操作" width="200" align="center">
         <template #default="scope">
+          <el-button
+            size="small"
+            type="primary"
+            @click="handleDownloadFile(scope.row)"
+            v-if="userStore.hasPermission('resource:download')"
+          >
+            下载
+          </el-button>
           <el-button
             size="small"
             type="danger"
             @click="handleDeleteFile(scope.row.id)"
-            v-if="userStore.hasPermission('admin:file:delete') || userStore.hasPermission('admin:file:manage')"
+            v-if="userStore.hasPermission('admin:file:delete')"
           >
             删除
           </el-button>
@@ -65,6 +73,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { adminApi, type SysFile } from '@/api/admin'
+import { fileApi } from '@/api/file'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatDateTime, formatFileSize } from '@/utils/admin'
 
@@ -78,7 +87,7 @@ const total = ref(0)
 const keyword = ref('')
 
 const canAccess = computed(() => {
-  return userStore.hasPermission('admin:file:read') || userStore.hasPermission('admin:file:manage')
+  return userStore.hasPermission('admin:file:read')
 })
 
 // 是否已加载过数据（防止重复加载）
@@ -110,8 +119,41 @@ const handlePageSizeChange = () => {
   loadFiles()
 }
 
+const handleDownloadFile = async (file: SysFile) => {
+  if (!userStore.hasPermission('resource:download')) {
+    ElMessage.warning('暂无下载权限，请联系管理员')
+    return
+  }
+  
+  if (!file || !file.id) {
+    ElMessage.warning('文件不存在')
+    return
+  }
+  
+  try {
+    // 通过后端接口下载文件
+    const blob = await fileApi.downloadFile(file.id)
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = file.originalName || 'download'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('下载成功')
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.message || error.message || '下载失败'
+    ElMessage.error(errorMessage)
+    console.error('下载失败:', error)
+  }
+}
+
 const handleDeleteFile = async (id: number) => {
-  if (!userStore.hasPermission('admin:file:delete') && !userStore.hasPermission('admin:file:manage')) {
+  if (!userStore.hasPermission('admin:file:delete')) {
     ElMessage.error('无权限执行此操作')
     return
   }
