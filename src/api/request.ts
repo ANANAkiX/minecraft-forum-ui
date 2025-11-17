@@ -3,6 +3,7 @@ import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import router from '@/router'
+import { ErrorHandler } from '@/utils/errorHandler'
 
 interface ApiResponse<T = any> {
   code: number
@@ -68,88 +69,37 @@ class Request {
           }
         },
         (error) => {
-          // 如果是 blob 响应但出错了，尝试解析错误信息
+          const url = (error.config?.url || '').toLowerCase()
+          const isAuthEndpoint = url.includes('/login') || url.includes('/register')
+          
+          // 如果是 blob 响应但出错了（通常是文件下载）
           if (error.response?.data instanceof Blob && error.response.status !== 200) {
-            // 尝试读取错误信息
-            error.response.data.text().then((text: string) => {
-              try {
-                const errorData = JSON.parse(text)
-                ElMessage.error(errorData.message || '下载失败')
-              } catch {
-                if (error.response.status === 403) {
-                  ElMessage.error('暂无下载权限，请联系管理员')
-                } else if (error.response.status === 404) {
-                  ElMessage.error('文件不存在')
-                } else {
-                  ElMessage.error('下载失败')
-                }
-              }
-            }).catch(() => {
-              if (error.response.status === 403) {
-                ElMessage.error('暂无下载权限，请联系管理员')
-              } else if (error.response.status === 404) {
-                ElMessage.error('文件不存在')
-              } else {
-                ElMessage.error('下载失败')
-              }
-            })
+            ErrorHandler.handleDownloadError(error)
             return Promise.reject(error)
           }
           
-          // 处理 HTTP 状态码错误（非 blob 响应）
+          // 处理 HTTP 状态码错误
           if (error.response) {
-            // 401错误已在上面处理，这里不再重复
+            // 401错误已在响应拦截器中处理
             if (error.response.status === 401) {
-              // 401错误已在响应拦截器中处理，这里只返回reject
               return Promise.reject(error)
             }
             
             // 对于登录和注册接口，不在这里显示错误，让对应的函数自己处理
-            const url = (error.config?.url || '').toLowerCase()
-            if (url.includes('/login') || url.includes('/register')) {
+            if (isAuthEndpoint) {
               return Promise.reject(error)
             }
             
-            if (error.response.status === 403) {
-              // 403错误可能是权限问题，检查是否是下载权限
-              if (url.includes('/download')) {
-                ElMessage.error('暂无下载权限，请联系管理员')
-              } else {
-                const message = error.response?.data?.message || '无权限执行此操作'
-                ElMessage.error(message)
-              }
-            } else if (error.response.status === 404) {
-              ElMessage.error('资源不存在')
-            } else {
-              // 尝试从响应中获取错误消息
-              const responseData = error.response.data
-              let errorMessage = '网络错误'
-              
-              if (responseData) {
-                // 如果是Result格式的响应
-                if (responseData.message) {
-                  errorMessage = responseData.message
-                } else if (typeof responseData === 'string') {
-                  errorMessage = responseData
-                }
-              }
-              
-              // 只在有具体错误消息时显示，避免显示"网络错误"等通用消息
-              if (errorMessage && errorMessage !== '网络错误') {
-                ElMessage.error(errorMessage)
-              } else if (!errorMessage || errorMessage === '网络错误') {
-                // 网络错误时才显示
-                ElMessage.error(errorMessage)
-              }
-            }
+            // 使用统一的错误处理
+            ErrorHandler.handleApiError(error)
           } else {
             // 没有响应，可能是网络错误
             // 对于登录和注册接口，不在这里显示错误
-            const url = (error.config?.url || '').toLowerCase()
-            if (!url.includes('/login') && !url.includes('/register')) {
-              ElMessage.error(error.message || '网络错误')
+            if (!isAuthEndpoint) {
+              ErrorHandler.handleApiError(error, '网络错误')
             }
           }
+          
           return Promise.reject(error)
         }
       )
