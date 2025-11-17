@@ -5,7 +5,7 @@
       <el-button 
         type="primary" 
         @click="handleAddRole" 
-        v-if="userStore.hasPermission('admin:role:create')"
+        v-if="permissions.createRole.value"
       >
         添加角色
       </el-button>
@@ -33,14 +33,14 @@
             <el-button 
               size="small" 
               @click="handleEditRole(scope.row)" 
-              v-if="userStore.hasPermission('admin:role:update')"
+              v-if="permissions.updateRole.value"
             >
               编辑
             </el-button>
             <el-button 
               size="small" 
               @click="handleManageRolePermissions(scope.row)" 
-              v-if="userStore.hasPermission('admin:role:update')"
+              v-if="permissions.managePermissions.value"
             >
               分配权限
             </el-button>
@@ -48,7 +48,7 @@
               size="small" 
               type="danger" 
               @click="handleDeleteRole(scope.row.id)" 
-              v-if="userStore.hasPermission('admin:role:delete')"
+              v-if="permissions.deleteRole.value"
             >
               删除
             </el-button>
@@ -95,8 +95,12 @@ import { adminApi, type Role } from '@/api/admin'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatDateTime } from '@/utils/admin'
 import RolePermissionDialog from './RolePermissionDialog.vue'
+import { usePermission } from '@/composables/usePermission'
+import { roleManagementButtonPermissions } from '@/config/permission-config'
 
 const userStore = useUserStore()
+const { createPermissionChecks } = usePermission()
+const permissions = createPermissionChecks(roleManagementButtonPermissions)
 
 const loading = ref(false)
 const roleList = ref<Role[]>([])
@@ -117,7 +121,7 @@ const currentRoleForPermission = ref<Role | null>(null)
 const hasLoaded = ref(false)
 
 const loadRoles = async () => {
-  if (!userStore.hasPermission('admin:role:read')) {
+  if (!permissions.readRole.value) {
     return
   }
   loading.value = true
@@ -133,7 +137,7 @@ const loadRoles = async () => {
 }
 
 const handleAddRole = () => {
-  if (!userStore.hasPermission('admin:role:create')) {
+  if (!permissions.createRole.value) {
     ElMessage.error('无权限执行此操作')
     return
   }
@@ -148,7 +152,7 @@ const handleAddRole = () => {
 }
 
 const handleEditRole = (role: Role) => {
-  if (!userStore.hasPermission('admin:role:update')) {
+  if (!permissions.updateRole.value) {
     ElMessage.error('无权限执行此操作')
     return
   }
@@ -165,14 +169,14 @@ const handleSaveRole = async () => {
   
   try {
     if (form.value.id) {
-      if (!userStore.hasPermission('admin:role:update')) {
+      if (!permissions.updateRole.value) {
         ElMessage.error('无权限执行此操作')
         return
       }
       await adminApi.updateRole(form.value.id, form.value)
       ElMessage.success('更新成功')
     } else {
-      if (!userStore.hasPermission('admin:role:create')) {
+      if (!permissions.createRole.value) {
         ElMessage.error('无权限执行此操作')
         return
       }
@@ -187,7 +191,7 @@ const handleSaveRole = async () => {
 }
 
 const handleDeleteRole = async (id: number) => {
-  if (!userStore.hasPermission('admin:role:delete')) {
+  if (!permissions.deleteRole.value) {
     ElMessage.error('无权限执行此操作')
     return
   }
@@ -207,7 +211,7 @@ const handleDeleteRole = async (id: number) => {
 }
 
 const handleManageRolePermissions = (role: Role) => {
-  if (!userStore.hasPermission('admin:role:update')) {
+  if (!permissions.managePermissions.value) {
     ElMessage.error('无权限执行此操作')
     return
   }
@@ -217,7 +221,7 @@ const handleManageRolePermissions = (role: Role) => {
 
 onMounted(() => {
   // 懒加载：只在组件挂载且未加载过时加载数据
-  if (userStore.hasPermission('admin:role:read') && !hasLoaded.value) {
+  if (permissions.readRole.value && !hasLoaded.value) {
     loadRoles()
   }
 })

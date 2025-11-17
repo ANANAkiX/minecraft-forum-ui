@@ -110,11 +110,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
+import { usePermission } from '@/composables/usePermission'
+import { adminTabPermissions } from '@/config/permission-config'
 
 // 使用 defineAsyncComponent 实现懒加载
 const UserManagement = defineAsyncComponent(() => import('@/components/admin/UserManagement.vue'))
@@ -136,38 +138,22 @@ onMounted(() => {
   }
 })
 
-// 权限检查计算属性 - 统一管理所有权限检查逻辑
-// 注意：这6个权限（admin:user:manage, admin:resource:manage, admin:post:manage, 
-// admin:role:manage, admin:category:manage, admin:permission:manage）只控制导航标签的显示
+// 权限检查计算属性 - 从配置文件读取
+// 注意：这些权限只控制导航标签的显示
 // 页面内的CRUD操作由具体的操作权限控制（如admin:user:create, admin:user:update等）
-const canAccessUserManagement = computed(() => {
-  return userStore.hasPermission('admin:user:manage')
-})
+const { createPermissionChecks } = usePermission()
+const tabPermissions = createPermissionChecks(adminTabPermissions)
 
-const canAccessResourceManagement = computed(() => {
-  return userStore.hasPermission('admin:resource:manage')
-})
-
-const canAccessPostManagement = computed(() => {
-  return userStore.hasPermission('admin:post:manage')
-})
-
-const canAccessRoleManagement = computed(() => {
-  return userStore.hasPermission('admin:role:manage')
-})
-
-const canAccessCategoryManagement = computed(() => {
-  return userStore.hasPermission('admin:category:manage')
-})
-
-const canAccessFileManagement = computed(() => {
-  return userStore.hasPermission('admin:file:manage')
-})
-
-const canAccessPermissionManagement = computed(() => {
-  return userStore.hasPermission('admin:permission:manage')
-})
-
+// 解构出各个权限检查计算属性
+const {
+  canAccessUserManagement,
+  canAccessResourceManagement,
+  canAccessPostManagement,
+  canAccessRoleManagement,
+  canAccessCategoryManagement,
+  canAccessFileManagement,
+  canAccessPermissionManagement
+} = tabPermissions
 // 根据权限设置默认激活的标签页
 const getDefaultTab = () => {
   if (canAccessUserManagement.value) {
@@ -278,8 +264,7 @@ onMounted(() => {
   align-items: center;
   line-height: 15px;
   height: 20px;
-  margin: 0;
-  margin-right: 8px;
+  margin: 0 8px 0 0;
   vertical-align: middle;
 }
 

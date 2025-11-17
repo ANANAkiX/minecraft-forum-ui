@@ -16,7 +16,7 @@
       <el-button 
         type="primary" 
         @click="handleAddUser"
-        v-if="userStore.hasPermission('admin:user:create')"
+        v-if="permissions.createUser.value"
       >
         添加用户
       </el-button>
@@ -49,22 +49,22 @@
             <el-button 
               size="small" 
               @click="handleEditUser(scope.row)"
-              v-if="userStore.hasPermission('admin:user:update')"
+              v-if="permissions.editUser.value"
             >
               编辑
             </el-button>
             <el-button 
               size="small" 
               @click="handleManageRoles(scope.row)"
-              v-if="userStore.hasPermission('admin:user:update')"
+              v-if="permissions.manageRoles.value"
             >
-              角色管理
+              角色分配
             </el-button>
             <el-button 
               size="small" 
               type="danger" 
               @click="handleDeleteUser(scope.row.id)"
-              v-if="userStore.hasPermission('admin:user:delete')"
+              v-if="permissions.deleteUser.value"
             >
               删除
             </el-button>
@@ -130,8 +130,12 @@ import { adminApi, type User } from '@/api/admin'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatDateTime } from '@/utils/admin'
 import UserRoleDialog from './UserRoleDialog.vue'
+import { usePermission } from '@/composables/usePermission'
+import { userManagementButtonPermissions } from '@/config/permission-config'
 
 const userStore = useUserStore()
+const { createPermissionChecks, getPermissionCode } = usePermission()
+const permissions = createPermissionChecks(userManagementButtonPermissions)
 
 const loading = ref(false)
 const userList = ref<User[]>([])
@@ -157,7 +161,7 @@ const userForm = ref<Partial<User> & { password?: string }>({
 const hasLoaded = ref(false)
 
 const loadUsers = async () => {
-  if (!userStore.hasPermission('admin:user:read')) {
+  if (!permissions.readUser.value) {
     return
   }
   loading.value = true
@@ -183,7 +187,7 @@ const handlePageSizeChange = () => {
 }
 
 const handleStatusChange = async (user: User) => {
-  if (!userStore.hasPermission('admin:user:update')) {
+  if (!permissions.editUser.value) {
     ElMessage.error('无权限执行此操作')
     await loadUsers()
     return
@@ -198,7 +202,7 @@ const handleStatusChange = async (user: User) => {
 }
 
 const handleAddUser = () => {
-  if (!userStore.hasPermission('admin:user:create')) {
+  if (!permissions.createUser.value) {
     ElMessage.error('无权限执行此操作')
     return
   }
@@ -214,7 +218,7 @@ const handleAddUser = () => {
 }
 
 const handleEditUser = (user: User) => {
-  if (!userStore.hasPermission('admin:user:update')) {
+  if (!permissions.editUser.value) {
     ElMessage.error('无权限执行此操作')
     return
   }
@@ -237,7 +241,7 @@ const handleSaveUser = async () => {
   
   try {
     if (userForm.value.id) {
-      if (!userStore.hasPermission('admin:user:update')) {
+      if (!permissions.editUser.value) {
         ElMessage.error('无权限执行此操作')
         return
       }
@@ -248,7 +252,7 @@ const handleSaveUser = async () => {
       })
       ElMessage.success('用户更新成功')
     } else {
-      if (!userStore.hasPermission('admin:user:create')) {
+      if (!permissions.createUser.value) {
         ElMessage.error('无权限执行此操作')
         return
       }
@@ -269,7 +273,7 @@ const handleSaveUser = async () => {
 }
 
 const handleDeleteUser = async (_userId: number) => {
-  if (!userStore.hasPermission('admin:user:delete')) {
+  if (!permissions.deleteUser.value) {
     ElMessage.error('无权限执行此操作')
     return
   }
@@ -287,7 +291,7 @@ const handleDeleteUser = async (_userId: number) => {
 }
 
 const handleManageRoles = (user: User) => {
-  if (!userStore.hasPermission('admin:user:update')) {
+  if (!permissions.manageRoles.value) {
     ElMessage.error('无权限执行此操作')
     return
   }
@@ -296,7 +300,7 @@ const handleManageRoles = (user: User) => {
 }
 
 onMounted(() => {
-  if (userStore.hasPermission('admin:user:read')) {
+  if (permissions.readUser.value) {
     loadUsers()
   }
 })

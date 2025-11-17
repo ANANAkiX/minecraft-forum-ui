@@ -1,58 +1,58 @@
-import { computed } from 'vue'
+import { computed, type ComputedRef } from 'vue'
 import { useUserStore } from '@/stores/user'
+import type { PermissionConfigItem } from '@/config/permission-config'
 
 /**
- * 权限相关的 Composable
- * 提供便捷的权限检查方法
+ * 权限控制 Composable
+ * 根据配置文件生成权限检查的计算属性
  */
 export function usePermission() {
   const userStore = useUserStore()
 
   /**
-   * 检查是否有指定权限
+   * 根据权限配置生成计算属性
+   * @param config 权限配置对象
+   * @returns 包含所有权限检查计算属性的对象
    */
-  const hasPermission = (permissionCode: string): boolean => {
+  function createPermissionChecks<T extends Record<string, PermissionConfigItem>>(
+    config: T
+  ): Record<keyof T, ComputedRef<boolean>> {
+    const checks = {} as Record<keyof T, ComputedRef<boolean>>
+    
+    for (const [key, item] of Object.entries(config)) {
+      checks[key as keyof T] = computed(() => {
+        return userStore.hasPermission(item.permissionCode)
+      })
+    }
+    
+    return checks
+  }
+
+  /**
+   * 从配置中获取权限代码
+   * @param config 权限配置对象
+   * @param key 配置键名
+   * @returns 权限代码
+   */
+  function getPermissionCode<T extends Record<string, PermissionConfigItem>>(
+    config: T,
+    key: keyof T
+  ): string {
+    return config[key]?.permissionCode || ''
+  }
+
+  /**
+   * 检查单个权限（兼容旧代码）
+   * @param permissionCode 权限代码
+   * @returns 是否有权限
+   */
+  function hasPermission(permissionCode: string): boolean {
     return userStore.hasPermission(permissionCode)
   }
 
-  /**
-   * 检查是否有任意一个权限
-   */
-  const hasAnyPermission = (permissionCodes: string[]): boolean => {
-    return permissionCodes.some(code => userStore.hasPermission(code))
-  }
-
-  /**
-   * 检查是否有所有权限
-   */
-  const hasAllPermissions = (permissionCodes: string[]): boolean => {
-    return permissionCodes.every(code => userStore.hasPermission(code))
-  }
-
-  /**
-   * 是否是管理员
-   */
-  const isAdmin = computed(() => userStore.isAdmin)
-
-  /**
-   * 当前用户的所有权限
-   */
-  const permissions = computed(() => userStore.permissions)
-
   return {
-    hasPermission,
-    hasAnyPermission,
-    hasAllPermissions,
-    isAdmin,
-    permissions
+    createPermissionChecks,
+    getPermissionCode,
+    hasPermission
   }
 }
-
-
-
-
-
-
-
-
-

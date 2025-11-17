@@ -50,7 +50,7 @@ export interface ResourceForm {
 
 export const resourceApi = {
   getResourceList: (params: ResourceListParams) => request.get<ResourceListResponse>('/resource/list', { params }),
-  getResourceById: (id: number) => request.get<Resource>(`/resource/${id}`),
+  getResourceById: (id: number) => request.get<Resource>('/resource/detail', { params: { id } }),
   createResource: (data: ResourceForm | any) => {
     // 始终使用 FormData 格式，因为后端接口使用 @RequestParam
     const formData = new FormData()
@@ -67,13 +67,13 @@ export const resourceApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
-  updateResource: (id: number, data: Partial<ResourceForm>) => request.put(`/resource/${id}`, data),
-  deleteResource: (id: number) => request.delete(`/resource/${id}`),
-  likeResource: (id: number) => request.post(`/resource/${id}/like`),
-  unlikeResource: (id: number) => request.delete(`/resource/${id}/like`),
-  favoriteResource: (id: number) => request.post(`/resource/${id}/favorite`),
-  unfavoriteResource: (id: number) => request.delete(`/resource/${id}/favorite`),
-  downloadResource: (id: number) => request.post(`/resource/${id}/download`)
+  updateResource: (id: number, data: Partial<ResourceForm>) => request.put('/resource', { id, ...data }),
+  deleteResource: (id: number) => request.delete('/resource', { data: { id } }),
+  likeResource: (id: number) => request.post('/resource/like', { id }),
+  unlikeResource: (id: number) => request.delete('/resource/like', { data: { id } }),
+  favoriteResource: (id: number) => request.post('/resource/favorite', { id }),
+  unfavoriteResource: (id: number) => request.delete('/resource/favorite', { data: { id } }),
+  downloadResource: (id: number) => request.post('/resource/download', { id })
 }
 
 

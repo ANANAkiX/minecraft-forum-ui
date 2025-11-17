@@ -79,25 +79,25 @@ export interface PostForm {
 
 export const forumApi = {
   getPostList: (params: PostListParams) => request.get<PostListResponse>('/forum/posts', { params }),
-  getPostById: (id: number) => request.get<ForumPost>(`/forum/posts/${id}`),
+  getPostById: (id: number) => request.get<ForumPost>('/forum/posts/detail', { params: { id } }),
   createPost: (data: PostForm) => request.post<ForumPost>('/forum/posts', data),
-  updatePost: (id: number, data: Partial<PostForm>) => request.put(`/forum/posts/${id}`, data),
-  deletePost: (id: number) => request.delete(`/forum/posts/${id}`),
-  likePost: (id: number) => request.post(`/forum/posts/${id}/like`),
-  unlikePost: (id: number) => request.delete(`/forum/posts/${id}/like`),
+  updatePost: (id: number, data: Partial<PostForm>) => request.put('/forum/posts', { id, ...data }),
+  deletePost: (id: number) => request.delete('/forum/posts', { data: { id } }),
+  likePost: (id: number) => request.post('/forum/posts/like', { id }),
+  unlikePost: (id: number) => request.delete('/forum/posts/like', { data: { id } }),
   getCommentsByPostId: (postId: number, page: number = 1, pageSize: number = 10) => 
-    request.get<CommentListResponse>(`/forum/posts/${postId}/comments`, { params: { page, pageSize } }),
-  createComment: (postId: number, content: string) => request.post<Comment>(`/forum/posts/${postId}/comments`, { content }),
-  deleteComment: (commentId: number) => request.delete(`/forum/comments/${commentId}`),
+    request.get<CommentListResponse>('/forum/posts/comments', { params: { postId, page, pageSize } }),
+  createComment: (postId: number, content: string) => request.post<Comment>('/forum/posts/comments', { postId, content }),
+  deleteComment: (commentId: number) => request.delete('/forum/comments', { data: { id: commentId } }),
   createReply: (commentId: number, content: string, targetUserId?: number, parentId?: number) => 
-    request.post<Reply>(`/forum/comments/${commentId}/replies`, { content, targetUserId, parentId }),
-  deleteReply: (replyId: number) => request.delete(`/forum/replies/${replyId}`),
-  likeComment: (commentId: number) => request.post(`/forum/comments/${commentId}/like`),
-  unlikeComment: (commentId: number) => request.delete(`/forum/comments/${commentId}/like`),
-  likeReply: (replyId: number) => request.post(`/forum/replies/${replyId}/like`),
-  unlikeReply: (replyId: number) => request.delete(`/forum/replies/${replyId}/like`),
-  getUserComments: (userId: number) => request.get<Comment[]>(`/forum/users/${userId}/comments`),
-  getRepliesByCommentId: (commentId: number) => request.get<Reply[]>(`/forum/comments/${commentId}/replies`)
+    request.post<Reply>('/forum/comments/replies', { commentId, content, targetUserId, parentId }),
+  deleteReply: (replyId: number) => request.delete('/forum/replies', { data: { id: replyId } }),
+  likeComment: (commentId: number) => request.post('/forum/comments/like', { id: commentId }),
+  unlikeComment: (commentId: number) => request.delete('/forum/comments/like', { data: { id: commentId } }),
+  likeReply: (replyId: number) => request.post('/forum/replies/like', { id: replyId }),
+  unlikeReply: (replyId: number) => request.delete('/forum/replies/like', { data: { id: replyId } }),
+  getUserComments: (userId: number) => request.get<Comment[]>('/forum/users/comments', { params: { userId } }),
+  getRepliesByCommentId: (commentId: number) => request.get<Reply[]>('/forum/comments/replies', { params: { commentId } })
 }
 
 

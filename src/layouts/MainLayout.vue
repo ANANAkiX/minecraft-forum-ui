@@ -56,9 +56,9 @@
                   <el-icon><Search /></el-icon>
                 </template>
               </el-input>
-                    <!-- 自定义下拉建议列表 -->
+                    <!-- Elasticsearch搜索下拉建议列表（仅在开启Elasticsearch时显示） -->
                     <div
-                      v-if="showSuggestions && searchKeyword.trim().length >= 2"
+                      v-if="userStore.elasticsearchEnabled && showSuggestions && searchKeyword.trim().length >= 2"
                       class="search-suggestions"
                       @mousedown.prevent
                     >
@@ -261,6 +261,11 @@ const formatSuggestion = (result: SearchResult): string => {
 
 // 输入处理（防抖）
 const handleSearchInput = () => {
+  // 如果未开启Elasticsearch，不处理输入（只处理回车搜索）
+  if (!userStore.elasticsearchEnabled) {
+    return
+  }
+  
   // 清除之前的定时器
   if (searchTimer) {
     clearTimeout(searchTimer)
@@ -287,13 +292,18 @@ const handleSearchInput = () => {
 
 // 搜索框获得焦点
 const handleSearchFocus = () => {
+  // 如果未开启Elasticsearch，不显示下拉建议
+  if (!userStore.elasticsearchEnabled) {
+    return
+  }
+  
   // 如果有搜索关键词且长度>=2，显示搜索框
   if (searchKeyword.value && searchKeyword.value.trim().length >= 2) {
     showSuggestions.value = true
   }
 }
 
-// 执行搜索
+// 执行搜索（仅用于Elasticsearch搜索）
 const performSearch = async () => {
   const keyword = searchKeyword.value?.trim() || ''
   
@@ -301,6 +311,11 @@ const performSearch = async () => {
     searchResults.value = []
     showSuggestions.value = false
     searchLoading.value = false
+    return
+  }
+  
+  // 如果未开启Elasticsearch，不执行搜索
+  if (!userStore.elasticsearchEnabled) {
     return
   }
   
@@ -399,18 +414,30 @@ const handleSearchBlur = () => {
 
 // 回车搜索
 const handleSearch = () => {
-  if (searchKeyword.value.trim()) {
-    // 如果有搜索结果，跳转到第一个结果或选中的结果
-    if (searchResults.value.length > 0) {
-      const result = selectedIndex.value >= 0 
-        ? searchResults.value[selectedIndex.value]
-        : searchResults.value[0]
-      handleSelectResult(result)
-    } else {
-      // 如果没有搜索结果，使用原来的搜索方式
-      router.push({ name: 'Home', query: { keyword: searchKeyword.value } })
-      searchKeyword.value = ''
-    }
+  if (!searchKeyword.value.trim()) {
+    return
+  }
+  
+  // 如果未开启Elasticsearch，使用传统搜索模式（跳转到首页）
+  if (!userStore.elasticsearchEnabled) {
+    router.push({ name: 'Home', query: { keyword: searchKeyword.value } })
+    searchKeyword.value = ''
+    return
+  }
+  
+  // Elasticsearch搜索模式
+  // 如果有搜索结果，跳转到第一个结果或选中的结果
+  if (searchResults.value.length > 0) {
+    const result = selectedIndex.value >= 0 
+      ? searchResults.value[selectedIndex.value]
+      : searchResults.value[0]
+    handleSelectResult(result)
+  } else {
+    // 如果没有搜索结果，使用传统搜索方式（跳转到首页）
+    router.push({ name: 'Home', query: { keyword: searchKeyword.value } })
+    searchKeyword.value = ''
+    searchResults.value = []
+    showSuggestions.value = false
   }
 }
 

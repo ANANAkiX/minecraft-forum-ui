@@ -31,15 +31,16 @@ export const fileApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
-  getFile: (id: number) => request.get(`/files/${id}`),
-  getFilesByResourceId: (resourceId: number) => request.get<SysFile[]>(`/files/resource/${resourceId}`),
+  getFile: (id: number) => request.get('/files/detail', { params: { id } }),
+  getFilesByResourceId: (resourceId: number) => request.get<SysFile[]>('/files/resource', { params: { resourceId } }),
   downloadFile: (id: number) => {
     // 使用 blob 方式下载文件
-    return request.get(`/files/${id}/download`, {
+    return request.get('/files/download', {
+      params: { id },
       responseType: 'blob'
     })
   },
-  deleteFile: (id: number) => request.delete(`/files/${id}`)
+  deleteFile: (id: number) => request.delete('/files', { data: { id } })
 }
 
 export interface SysFile {

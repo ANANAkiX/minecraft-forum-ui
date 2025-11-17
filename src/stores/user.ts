@@ -3,9 +3,6 @@ import { ref, computed } from 'vue'
 import { userApi, type UserInfo, type LoginForm, type RegisterForm } from '@/api/user'
 import { configApi } from '@/api/config'
 import { ElMessage } from 'element-plus'
-import { 
-  isTokenExpired
-} from '@/utils/auth'
 
 export const useUserStore = defineStore('user', () => {
   // 从localStorage获取token时也要清理（去除空格、换行等）
@@ -20,6 +17,8 @@ export const useUserStore = defineStore('user', () => {
   const permissions = ref<string[]>([])
   // 系统配置：是否允许匿名访问首页和论坛
   const anonymousAccess = ref<boolean>(true) // 默认允许匿名访问
+  // 系统配置：是否开启Elasticsearch搜索
+  const elasticsearchEnabled = ref<boolean>(true) // 默认开启Elasticsearch搜索
   // 是否正在加载用户信息（防止重复调用）
   const loadingUserInfo = ref<boolean>(false)
 
@@ -206,15 +205,29 @@ export const useUserStore = defineStore('user', () => {
       token.value = response.token
       localStorage.setItem('token', response.token)
       
-      // 获取完整的用户信息（包含最新权限）
+      // 强制重新获取用户信息（包含最新权限）
+      // 先清除旧的用户信息，确保会重新获取
+      const oldUserInfo = userInfo.value
+      userInfo.value = null
+      loadingUserInfo.value = false
+      
       try {
-        await fetchUserInfo()
+        // 重新获取用户信息
+        loadingUserInfo.value = true
+        const info = await userApi.getUserInfo()
+        userInfo.value = info
+        updatePermissionsFromUserInfo()
       } catch (error) {
         // 如果获取用户信息失败，尝试使用返回的用户信息
         if (response.user) {
           userInfo.value = response.user
           updatePermissionsFromUserInfo()
+        } else {
+          // 如果都没有，恢复旧信息（避免丢失）
+          userInfo.value = oldUserInfo
         }
+      } finally {
+        loadingUserInfo.value = false
       }
       
       return true
@@ -230,6 +243,7 @@ export const useUserStore = defineStore('user', () => {
     userInfo.value = null
     permissions.value = []
     anonymousAccess.value = true // 重置为默认值
+    elasticsearchEnabled.value = true // 重置为默认值
     
     // 清空所有localStorage中的数据
     localStorage.removeItem('token')
@@ -247,10 +261,12 @@ export const useUserStore = defineStore('user', () => {
     try {
       const config = await configApi.getSystemConfig()
       anonymousAccess.value = config.anonymousAccess ?? true
+      elasticsearchEnabled.value = config.elasticsearchEnabled ?? true
     } catch (error) {
-      // 如果获取配置失败，使用默认值（允许匿名访问）
+      // 如果获取配置失败，使用默认值
       console.warn('获取系统配置失败，使用默认值', error)
       anonymousAccess.value = true
+      elasticsearchEnabled.value = true
     }
   }
 
@@ -259,6 +275,7 @@ export const useUserStore = defineStore('user', () => {
     userInfo,
     permissions,
     anonymousAccess,
+    elasticsearchEnabled,
     isLoggedIn,
     isAdmin,
     hasPermission,

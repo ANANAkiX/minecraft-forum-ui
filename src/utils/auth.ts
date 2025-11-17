@@ -1,4 +1,5 @@
 // src/utils/auth.ts
+// noinspection JSUnusedLocalSymbols
 
 import {useRouter} from "vue-router";
 
@@ -9,44 +10,6 @@ const router = useRouter()
  * Token 现在是 UUID 格式，存储在 Redis 中
  * 前端无法解析 Token 内容，需要完全依赖后端 API 返回的权限信息
  */
-
-/**
- * 从 Token 中获取权限列表（已废弃，Token 现在是 UUID，无法解析）
- * 权限信息应该从 /api/user/info 接口获取
- * @deprecated 使用 userStore 中的权限信息
- */
-export function getPermissionsFromToken(token: string | null): string[] {
-  // Token 现在是 UUID，无法解析，返回空数组
-  // 权限信息应该从后端 API 获取
-  return [];
-}
-
-/**
- * 从 Token 中获取用户ID（已废弃，Token 现在是 UUID，无法解析）
- * @deprecated 使用 userStore 中的用户信息
- */
-export function getUserIdFromToken(token: string | null): number | null {
-  // Token 现在是 UUID，无法解析
-  return null;
-}
-
-/**
- * 从 Token 中获取用户名（已废弃，Token 现在是 UUID，无法解析）
- * @deprecated 使用 userStore 中的用户信息
- */
-export function getUsernameFromToken(token: string | null): string | null {
-  // Token 现在是 UUID，无法解析
-  return null;
-}
-
-/**
- * 从 Token 中获取角色（已废弃，Token 现在是 UUID，无法解析）
- * @deprecated 角色现在通过 user_role 表管理
- */
-export function getRoleFromToken(token: string | null): string | null {
-  // Token 现在是 UUID，无法解析
-  return null;
-}
 
 /**
  * 检查 Token 是否过期
