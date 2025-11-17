@@ -14,11 +14,14 @@
             <el-button @click="loadPermissions">搜索</el-button>
           </template>
         </el-input>
-        <el-select v-model="typeFilter" placeholder="权限类型筛选" clearable style="width: 200px" @change="loadPermissions">
+        <el-select v-model="typeFilter" placeholder="权限类型筛选" clearable style="width: 200px" @change="handleFilterChange">
           <el-option label="全部" value="" />
           <el-option label="页面访问" value="PAGE" />
           <el-option label="操作权限" value="ACTION" />
         </el-select>
+        <el-checkbox v-model="includeDisabled" @change="loadPermissions" style="margin-left: 10px;">
+          包含禁用权限
+        </el-checkbox>
       </div>
       <el-button
         type="primary"
@@ -28,72 +31,48 @@
         添加权限
       </el-button>
     </div>
-    <el-table :data="permissionList" v-loading="loading" style="width: 100%" :cell-style="{ padding: '8px' }">
-      <el-table-column prop="id" label="ID" width="60" align="center" />
-      <el-table-column prop="code" label="权限代码" width="150" align="center" show-overflow-tooltip>
-        <template #default="scope">
-          <span>{{ scope.row.code }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="name" label="权限名称" width="150" align="center" show-overflow-tooltip>
-        <template #default="scope">
-          <span>{{ scope.row.name }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="type" label="类型" width="100" align="center">
-        <template #default="scope">
-          <el-tag :type="scope.row.type === 'PAGE' ? 'success' : 'info'" size="small">
-            {{ scope.row.type === 'PAGE' ? '页面访问' : '操作权限' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="description" label="描述" width="180" align="center" show-overflow-tooltip>
-        <template #default="scope">
-          <span>{{ scope.row.description || '-' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="router" label="路由地址" width="150" align="center" show-overflow-tooltip>
-        <template #default="scope">
-          <span v-if="scope.row.router">{{ scope.row.router }}</span>
-          <span v-else style="color: #999;">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="apiurl" label="API地址" width="200" align="center" show-overflow-tooltip>
-        <template #default="scope">
-          <span v-if="scope.row.apiurl">
-            <el-tag size="small" :type="getMethodTypeColor(scope.row.methodtype)" style="margin-right: 4px;">
-              {{ scope.row.methodtype || 'GET' }}
+    <el-tree
+      ref="treeRef"
+      v-loading="loading"
+      :data="filteredPermissionTree"
+      :props="treeProps"
+      :default-expand-all="false"
+      :filter-node-method="filterNode"
+      node-key="id"
+      style="width: 100%"
+    >
+      <template #default="{ data }">
+        <div class="tree-node-wrapper">
+          <div class="tree-node-content">
+            <span class="node-name">{{ data.name }}</span>
+            <span class="node-code">{{ data.code }}</span>
+            <el-tag
+              :type="data.type === 'PAGE' ? 'success' : 'info'"
+              size="small"
+              style="margin: 0 8px;"
+            >
+              {{ data.type === 'PAGE' ? '页面访问' : '操作权限' }}
             </el-tag>
-            <span>{{ scope.row.apiurl }}</span>
-          </span>
-          <span v-else style="color: #999;">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="parentId" label="父权限ID" width="90" align="center">
-        <template #default="scope">
-          <span v-if="scope.row.parentId && scope.row.parentId !== 0">{{ scope.row.parentId }}</span>
-          <span v-else style="color: #999;">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="sortOrder" label="排序" width="70" align="center" />
-      <el-table-column prop="status" label="状态" width="80" align="center">
-        <template #default="scope">
-          <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'" size="small">
-            {{ scope.row.status === 1 ? '启用' : '禁用' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="createTime" label="创建时间" width="160" align="center" show-overflow-tooltip>
-        <template #default="scope">
-          {{ formatDateTime(scope.row.createTime) }}
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="120" align="center">
-        <template #default="scope">
-          <div style="display: flex; justify-content: center; gap: 8px;">
+            <span class="node-description" v-if="data.description">{{ data.description }}</span>
+            <span class="node-api" v-if="data.apiurl">
+              <el-tag size="small" :type="getMethodTypeColor(data.methodtype)" style="margin-right: 4px;">
+                {{ data.methodtype || 'GET' }}
+              </el-tag>
+              <span>{{ data.apiurl }}</span>
+            </span>
+            <span class="node-router" v-if="data.router">{{ data.router }}</span>
+            <el-tag
+              :type="data.status === 1 ? 'success' : 'danger'"
+              size="small"
+              style="margin: 0 8px;"
+            >
+              {{ data.status === 1 ? '启用' : '禁用' }}
+            </el-tag>
+          </div>
+          <div class="tree-node-actions">
             <el-button
               size="small"
-              @click="handleEditPermission(scope.row)"
+              @click.stop="handleEditPermission(data)"
               v-if="userStore.hasPermission('admin:permission:update')"
             >
               编辑
@@ -101,26 +80,16 @@
             <el-button
               size="small"
               type="danger"
-              @click="handleDeletePermission(scope.row.id)"
+              @click.stop="handleDeletePermission(data.id)"
               v-if="userStore.hasPermission('admin:permission:delete')"
             >
               删除
             </el-button>
           </div>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-pagination
-      v-if="total > 0"
-      v-model:current-page="page"
-      v-model:page-size="pageSize"
-      :total="total"
-      layout="total, prev, pager, next, sizes"
-      :page-sizes="[10, 20, 50, 100]"
-      @current-change="loadPermissions"
-      @size-change="handlePageSizeChange"
-      style="margin-top: 20px; justify-content: flex-end"
-    />
+        </div>
+      </template>
+    </el-tree>
+    <el-empty v-if="!loading && filteredPermissionTree.length === 0" description="暂无权限数据" />
 
     <!-- 权限编辑对话框 -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="600px">
@@ -182,8 +151,17 @@
         <el-form-item label="描述">
           <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入权限描述" />
         </el-form-item>
-        <el-form-item label="父权限ID">
-          <el-input-number v-model="form.parentId" :min="0" placeholder="0表示顶级权限" />
+        <el-form-item label="父权限">
+          <el-tree-select
+            v-model="form.parentId"
+            :data="permissionTreeOptions"
+            :props="{ value: 'id', label: 'name', children: 'children' }"
+            placeholder="请选择父权限"
+            check-strictly
+            clearable
+            :default-expanded-keys="[0]"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="排序">
           <el-input-number v-model="form.sortOrder" :min="0" />
@@ -203,19 +181,23 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
-import { adminApi, type Permission, type ApiInfo } from '@/api/admin'
+import { adminApi, type Permission, type PermissionTreeNode, type ApiInfo } from '@/api/admin'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { formatDateTime } from '@/utils/admin'
+import type { ElTree } from 'element-plus'
 
 const userStore = useUserStore()
 
 const loading = ref(false)
-const permissionList = ref<Permission[]>([])
-const page = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
+const permissionTree = ref<PermissionTreeNode[]>([])
 const keyword = ref('')
 const typeFilter = ref('')
+const includeDisabled = ref(false)
+const treeRef = ref<InstanceType<typeof ElTree>>()
+
+const treeProps = {
+  children: 'children',
+  label: 'name'
+}
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('添加权限')
@@ -234,6 +216,63 @@ const form = ref<Partial<Permission>>({
 const apiList = ref<ApiInfo[]>([])
 const loadingApis = ref(false)
 
+// 构建权限选择器选项（排除当前编辑的权限及其子权限，避免循环引用）
+// 添加一个虚拟的"根权限"选项，id为0
+const permissionTreeOptions = computed(() => {
+  const excludeIds = new Set<number>()
+  if (form.value.id) {
+    excludeIds.add(form.value.id)
+    // 递归添加子权限ID
+    const addChildren = (nodes: PermissionTreeNode[]) => {
+      for (const node of nodes) {
+        if (excludeIds.has(node.id)) {
+          if (node.children) {
+            for (const child of node.children) {
+              excludeIds.add(child.id)
+              if (child.children) {
+                addChildren([child])
+              }
+            }
+          }
+        }
+        if (node.children) {
+          addChildren(node.children)
+        }
+      }
+    }
+    addChildren(permissionTree.value)
+  }
+  
+  const filterTree = (nodes: PermissionTreeNode[]): PermissionTreeNode[] => {
+    return nodes
+      .filter(node => !excludeIds.has(node.id))
+      .map(node => {
+        const newNode = { ...node }
+        if (node.children && node.children.length > 0) {
+          newNode.children = filterTree(node.children)
+        }
+        return newNode
+      })
+  }
+  
+  const filteredTree = filterTree(permissionTree.value)
+  
+  // 添加根权限选项（id为0，name为"根权限"）
+  const rootPermission: PermissionTreeNode = {
+    id: 0,
+    code: 'root',
+    name: '根权限',
+    type: 'PAGE',
+    description: '顶级权限，无父权限',
+    parentId: 0,
+    sortOrder: -1,
+    status: 1,
+    children: filteredTree
+  }
+  
+  return [rootPermission]
+})
+
 const canAccess = computed(() => {
   return userStore.hasPermission('admin:permission:read')
 })
@@ -241,20 +280,59 @@ const canAccess = computed(() => {
 // 是否已加载过数据（防止重复加载）
 const hasLoaded = ref(false)
 
+// 过滤树节点
+const filterNode = (value: string, data: PermissionTreeNode) => {
+  if (!value) return true
+  const query = value.toLowerCase()
+  return (
+    data.name.toLowerCase().includes(query) ||
+    data.code.toLowerCase().includes(query) ||
+    (data.description && data.description.toLowerCase().includes(query))
+  )
+}
+
+// 递归过滤树
+const filterTree = (tree: PermissionTreeNode[], keyword: string, type?: string): PermissionTreeNode[] => {
+  return tree
+    .map(node => {
+      const matchesKeyword = !keyword || filterNode(keyword, node)
+      const matchesType = !type || node.type === type
+      
+      let filteredChildren: PermissionTreeNode[] = []
+      if (node.children && node.children.length > 0) {
+        filteredChildren = filterTree(node.children, keyword, type)
+      }
+      
+      const nodeMatches = matchesKeyword && matchesType
+      const hasMatchingChildren = filteredChildren.length > 0
+      
+      if (nodeMatches || hasMatchingChildren) {
+        const newNode = { ...node }
+        if (filteredChildren.length > 0) {
+          newNode.children = filteredChildren
+        }
+        return newNode
+      }
+      
+      return null
+    })
+    .filter((node): node is PermissionTreeNode => node !== null)
+}
+
+const filteredPermissionTree = computed(() => {
+  if (!keyword.value && !typeFilter.value) {
+    return permissionTree.value
+  }
+  return filterTree(permissionTree.value, keyword.value, typeFilter.value || undefined)
+})
+
 const loadPermissions = async () => {
   if (!canAccess.value) {
     return
   }
   loading.value = true
   try {
-    const result = await adminApi.getPermissionList({
-      page: page.value,
-      pageSize: pageSize.value,
-      keyword: keyword.value || undefined,
-      type: typeFilter.value || undefined
-    })
-    permissionList.value = result.list
-    total.value = result.total
+    permissionTree.value = await adminApi.getPermissionTree(includeDisabled.value)
   } catch (error) {
     ElMessage.error('加载权限列表失败')
   } finally {
@@ -263,9 +341,10 @@ const loadPermissions = async () => {
   }
 }
 
-const handlePageSizeChange = () => {
-  page.value = 1
-  loadPermissions()
+const handleFilterChange = () => {
+  if (treeRef.value) {
+    treeRef.value.filter(keyword.value)
+  }
 }
 
 const handleAddPermission = () => {
@@ -383,7 +462,6 @@ const handleSavePermission = async () => {
       }
       await adminApi.createPermission(form.value)
       ElMessage.success('添加成功')
-      page.value = 1
     }
     dialogVisible.value = false
     loadPermissions()
@@ -427,11 +505,6 @@ const handleDeletePermission = async (id: number) => {
     })
     await adminApi.deletePermission(id)
     ElMessage.success('删除成功')
-    
-    // 如果当前页没有数据了，返回上一页
-    if (permissionList.value.length === 1 && page.value > 1) {
-      page.value--
-    }
     loadPermissions()
   } catch (error: any) {
     if (error !== 'cancel') {
@@ -466,11 +539,67 @@ onMounted(() => {
   padding: 8px 0;
 }
 
-:deep(.el-table .cell) {
-  white-space: nowrap;
+.tree-node-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.tree-node-content {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+}
+
+.node-name {
+  font-weight: 500;
+  min-width: 120px;
+}
+
+.node-code {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  min-width: 150px;
+}
+
+.node-description {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.node-api {
+  font-size: 12px;
+  min-width: 200px;
+}
+
+.node-router {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  min-width: 150px;
+}
+
+.tree-node-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+:deep(.el-tree-node__content) {
+  height: auto;
+  min-height: 40px;
+}
+
+:deep(.el-tree-node__label) {
+  width: 100%;
 }
 </style>
 

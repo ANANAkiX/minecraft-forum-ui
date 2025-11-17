@@ -10,9 +10,9 @@
     <div v-if="role">
       <p><strong>角色：</strong>{{ role.name }} ({{ role.code }})</p>
       <el-divider />
-      <PermissionTransfer
+      <PermissionTreeTransfer
         v-model="rolePermissionIds"
-        :data="transferPermissionData"
+        :data="permissionTree"
       />
       <div style="margin-top: 20px; display: flex; justify-content: center; gap: 16px;">
         <el-button type="primary" @click="handleSave">保存权限</el-button>
@@ -25,9 +25,9 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useUserStore } from '@/stores/user'
-import { adminApi, type Role, type Permission } from '@/api/admin'
+import { adminApi, type Role, type PermissionTreeNode } from '@/api/admin'
 import { ElMessage } from 'element-plus'
-import PermissionTransfer from '@/components/PermissionTransfer.vue'
+import PermissionTreeTransfer from '@/components/PermissionTreeTransfer.vue'
 
 interface Props {
   modelValue: boolean
@@ -48,16 +48,7 @@ const dialogVisible = computed({
 
 const rolePermissionIds = ref<number[]>([])
 const originalRolePermissionIds = ref<number[]>([])
-const allPermissions = ref<Permission[]>([])
-
-const transferPermissionData = computed(() => {
-  return allPermissions.value.map(p => ({
-    key: p.id,
-    label: p.name,
-    code: p.code,
-    description: p.description
-  }))
-})
+const permissionTree = ref<PermissionTreeNode[]>([])
 
 const loadData = async () => {
   if (!props.role) return
@@ -68,9 +59,8 @@ const loadData = async () => {
     rolePermissionIds.value = permissions.map(p => p.id)
     originalRolePermissionIds.value = [...rolePermissionIds.value]
     
-    // 加载所有可用权限
-    const allPermsResult = await adminApi.getPermissionList({ page: 1, pageSize: 1000 })
-    allPermissions.value = allPermsResult.list
+    // 加载权限树
+    permissionTree.value = await adminApi.getPermissionTree(false)
   } catch (error) {
     ElMessage.error('加载权限信息失败')
   }
@@ -108,7 +98,7 @@ const handleReset = () => {
 const handleClose = () => {
   rolePermissionIds.value = []
   originalRolePermissionIds.value = []
-  allPermissions.value = []
+  permissionTree.value = []
 }
 
 watch(() => props.modelValue, (val) => {

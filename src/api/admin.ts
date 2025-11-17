@@ -45,6 +45,21 @@ export interface Permission {
   updateTime: string
 }
 
+export interface PermissionTreeNode {
+  id: number
+  code: string
+  name: string
+  type: string
+  description: string
+  router?: string
+  apiurl?: string
+  methodtype?: string
+  parentId: number
+  sortOrder: number
+  status: number
+  children?: PermissionTreeNode[]
+}
+
 export interface ApiInfo {
   url: string
   method: string
@@ -147,6 +162,8 @@ export const adminApi = {
     request.delete(`/admin/files/${id}`),
   getPermissionList: (params: { page?: number; pageSize?: number; keyword?: string; type?: string }) => 
     request.get<{ list: Permission[]; total: number; page: number; pageSize: number }>('/admin/permissions', { params }),
+  getPermissionTree: (includeDisabled?: boolean) => 
+    request.get<PermissionTreeNode[]>('/admin/permissions/tree', { params: { includeDisabled } }),
   createPermission: (permission: Partial<Permission>) => 
     request.post<Permission>('/admin/permissions', permission),
   updatePermission: (id: number, permission: Partial<Permission>) => 
