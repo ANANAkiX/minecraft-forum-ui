@@ -1,5 +1,4 @@
 import { ElMessage } from 'element-plus'
-import type { AxiosError } from 'axios'
 
 /**
  * 错误处理工具函数
